@@ -437,8 +437,8 @@ def load_checkpoint(
         optimizer.load_scheduler_state_dict(state["scheduler"])
 
     else:
-        epoch = state["epoch"] + 1
-        iters = state["iters"]
+        epoch = 0
+        iters = 0
 
     return model, optimizer, epoch, iters
 
