@@ -43,7 +43,7 @@ hift_checkpoint_path, hift_config_path = load_custom_model_from_hf("Plachta/Seed
                                                 "hifigan.yml")
 hift_config = yaml.safe_load(open(hift_config_path, 'r'))
 hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
-hift_gen.load_state_dict(torch.load(hift_config['pretrained_model_path'], map_location='cpu'))
+hift_gen.load_state_dict(torch.load(hift_checkpoint_path, map_location='cpu'))
 hift_gen.eval()
 hift_gen.to(device)
 
@@ -129,9 +129,9 @@ if __name__ == "__main__":
     inputs = [
         gr.Audio(source="upload", type="filepath", label="Source Audio"),
         gr.Audio(source="upload", type="filepath", label="Reference Audio"),
-        gr.Slider(minimum=1, maximum=1000, value=100, step=1, label="Diffusion Steps"),
+        gr.Slider(minimum=1, maximum=200, value=100, step=1, label="Diffusion Steps"),
         gr.Slider(minimum=0.5, maximum=2.0, step=0.1, value=1.0, label="Length Adjust"),
-        gr.Slider(minimum=0.1, maximum=1.0, step=0.1, value=0.7, label="Inference CFG Rate"),
+        gr.Slider(minimum=0.0, maximum=1.0, step=0.1, value=0.7, label="Inference CFG Rate"),
     ]
 
     outputs = gr.Audio(label="Output Audio")

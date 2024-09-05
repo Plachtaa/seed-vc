@@ -52,7 +52,7 @@ model_params:
     num_heads: 12
     depth: 12
     class_dropout_prob: 0.1
-    block_size: 4096
+    block_size: 8192
     in_channels: 80
     style_condition: true
     final_layer_type: 'wavenet'
