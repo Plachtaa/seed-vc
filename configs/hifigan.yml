@@ -22,4 +22,4 @@ f0_predictor:
     in_channels: 80
     cond_channels: 512
 
-pretrained_model_path: "hift.pt"
+pretrained_model_path: "checkpoints/hift.pt"
