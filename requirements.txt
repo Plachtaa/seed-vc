@@ -4,4 +4,7 @@ torchaudio==2.4.0
 scipy==1.13.1
 onnxruntime-gpu==1.19.0
 librosa==0.10.2
+munch==4.0.0
+einops==0.8.0
+openai-whisper
 huggingface-hub

@@ -26,7 +26,7 @@ model_params:
   reg_loss_type: "l2" # l1 or l2
 
   speech_tokenizer:
-    path: "speech_tokenizer_v1.onnx"
+    path: "checkpoints/speech_tokenizer_v1.onnx"
 
   style_encoder:
     dim: 192

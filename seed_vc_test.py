@@ -27,7 +27,7 @@ model = build_model(model_params, stage='DiT')
 hop_length = config['preprocess_params']['spect_params']['hop_length']
 sr = config['preprocess_params']['sr']
 
-model, _, _, _ = load_checkpoint(model, None, "E:/DiT_epoch_00006_step_315000_seed_v2_online.pth",
+model, _, _, _ = load_checkpoint(model, None, "checkpoints/DiT_step_315000_seed_v2_online_pruned.pth",
                                                        load_only_params=True,
                                                        ignore_modules=[], is_distributed=False)
 _ = [model[key].eval() for key in model]
@@ -151,7 +151,7 @@ def main(args):
 
     source_name = source.split("/")[-1].split(".")[0]
     target_name = target_name.split("/")[-1].split(".")[0]
-    torchaudio.save(f"reconstructed/vc_{source_name}_{target_name}_{length_adjust}_{diffusion_steps}_{inference_cfg_rate}.wav", vc_wave.cpu(), sr)
+    torchaudio.save(os.path.join(args.output, f"vc_{source_name}_{target_name}_{length_adjust}_{diffusion_steps}_{inference_cfg_rate}.wav"), vc_wave.cpu(), sr)
 
 
 
@@ -159,6 +159,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=str, default="./test_waves/s4p2.wav")
     parser.add_argument("--target", type=str, default="./test_waves/cafe_0.wav")
+    parser.add_argument("--output", type=str, default="./reconstructed")
     parser.add_argument("--diffusion-steps", type=int, default=100)
     parser.add_argument("--length-adjust", type=float, default=1.0)
     parser.add_argument("--inference-cfg-rate", type=float, default=0.7)
