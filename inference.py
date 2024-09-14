@@ -166,8 +166,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", type=str, default="./test_waves/source_s1.wav")
-    parser.add_argument("--target", type=str, default="./test_waves/s1p1.wav")
+    parser.add_argument("--source", type=str, default="./examples/source/source_s1.wav")
+    parser.add_argument("--target", type=str, default="./examples/target/s1p1.wav")
     parser.add_argument("--output", type=str, default="./reconstructed")
     parser.add_argument("--diffusion-steps", type=int, default=10)
     parser.add_argument("--length-adjust", type=float, default=1.0)
