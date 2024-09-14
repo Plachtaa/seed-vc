@@ -24,7 +24,7 @@ where:
 - `source` is the path to the speech file to convert to reference voice
 - `target` is the path to the speech file as voice reference
 - `output` is the path to the output directory
-- `diffusion-steps` is the number of diffusion steps to use, default is 25, use 50~100 for best quality, use 4~10 for fastest inference
+- `diffusion-steps` is the number of diffusion steps to use, default is 25, use 50-100 for best quality, use 4-10 for fastest inference
 - `length-adjust` is the length adjustment factor, default is 1.0, set <1.0 for speed-up speech, >1.0 for slow-down speech
 - `inference-cfg-rate` has subtle difference in the output, default is 0.7
 - `n-quantizers` is the number of quantizers from FAcodec to use, default is 3, the less quantizer used, the less prosody of source audio is preserved  
