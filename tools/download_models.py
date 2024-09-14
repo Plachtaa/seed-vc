@@ -24,7 +24,7 @@ local_dir = "./checkpoints"
 files = [
     "DiT_step_315000_seed_v2_online_pruned.pth",
     "README.md",
-    "config_dit_mel_seed.yml",
+    "config_dit_mel_seed_wavenet.yml",
     "hifigan.yml",
     "hift.pt",
     "speech_tokenizer_v1.onnx",

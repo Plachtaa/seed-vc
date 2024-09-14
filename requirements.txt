@@ -1,10 +1,13 @@
-torch==2.4.0
-torchvision==0.19.0
-torchaudio==2.4.0
+--extra-index-url https://download.pytorch.org/whl/cu113
+torch
+torchvision
+torchaudio
 scipy==1.13.1
 onnxruntime-gpu==1.19.0
 librosa==0.10.2
-munch==4.0.0
-einops==0.8.0
-openai-whisper
 huggingface-hub
+munch
+einops
+descript-audio-codec
+git+https://github.com/openai/whisper.git
+gradio
