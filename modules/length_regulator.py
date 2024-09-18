@@ -85,12 +85,18 @@ class InterpolateRegulator(nn.Module):
         mask = sequence_mask(ylens).unsqueeze(-1)
         x = F.interpolate(x.transpose(1, 2).contiguous(), size=ylens.max(), mode='nearest')
         if self.f0_condition:
-            quantized_f0 = torch.bucketize(f0, self.f0_bins.to(f0.device))  # (N, T)
-            drop_f0 = torch.rand(quantized_f0.size(0)).to(f0.device) < self.quantizer_dropout
-            f0_emb = self.f0_embedding(quantized_f0)
-            f0_emb[drop_f0] = self.f0_mask
-            f0_emb = F.interpolate(f0_emb.transpose(1, 2).contiguous(), size=ylens.max(), mode='nearest')
-            x = x + f0_emb
+            if f0 is None:
+                x = x + self.f0_mask.unsqueeze(-1)
+            else:
+                quantized_f0 = torch.bucketize(f0, self.f0_bins.to(f0.device))  # (N, T)
+                if self.training:
+                    drop_f0 = torch.rand(quantized_f0.size(0)).to(f0.device) < self.quantizer_dropout
+                else:
+                    drop_f0 = torch.zeros(quantized_f0.size(0)).to(f0.device).bool()
+                f0_emb = self.f0_embedding(quantized_f0)
+                f0_emb[drop_f0] = self.f0_mask
+                f0_emb = F.interpolate(f0_emb.transpose(1, 2).contiguous(), size=ylens.max(), mode='nearest')
+                x = x + f0_emb
         out = self.model(x).transpose(1, 2).contiguous()
         olens = ylens
         return out * mask, olens
