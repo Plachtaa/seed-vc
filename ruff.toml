@@ -1,0 +1,70 @@
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+extend-exclude = []
+line-length = 88
+indent-width = 4
+target-version = "py310"
+show-fixes = true
+src = [".", "modules"]
+
+[lint]
+select = [
+    "E", "F", "B", "Q", "I", "C90", "N", "D", "UP", "YTT", "ANN", "S", "BLE",
+    "FBT", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "ISC", "ICN", "INP",
+    "PIE", "T20", "PT", "Q", "RET", "SIM", "ARG", "ERA", "PD", "PGH", "PL",
+    "TRY", "RUF",
+]
+ignore = [
+    "D105",
+    "D107",
+    "D203",
+    "D213",
+    "S101",  # assert-used
+    "INP001",  # implicit-namespace-package
+    "ANN101",  # missing-type-self
+    "ANN102",  # missing-type-cls
+    "ANN204",  # missing-return-type-special-method
+    "ERA001",  # commented-out-code
+    "ANN002",  # missing-type-args
+    "ANN003",  # missing-type-kwargs
+    "RET504",  # unnecessary-assign
+    "COM812",  # TBD: some conflict
+    "ISC001",  # TBD: some conflict
+]
+fixable = ["ALL"]
+unfixable = []
+
+[format]
+quote-style = "double"
+indent-style = "space"
+
+[lint.isort]
+# force-sort-within-sections and lines-between-types should be incompatible
+force-sort-within-sections = false
+lines-between-types = 1
+force-single-line = true
+no-sections = false
+from-first = false
+
+[lint.pydocstyle]
+convention = "google"
