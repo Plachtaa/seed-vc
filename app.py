@@ -84,7 +84,7 @@ to_mel = lambda x: mel_spectrogram(x, **mel_fn_args)
 
 # f0 conditioned model
 dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                "DiT_step_404000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
+                                                "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
                                                 "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
 
 config = yaml.safe_load(open(dit_config_path, 'r'))
