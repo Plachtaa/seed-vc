@@ -32,7 +32,7 @@ def load_models(args):
         f0_extractor = None
     else:
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                        "DiT_step_404000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
+                                                        "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
                                                         "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
         # f0 extractor
         from modules.rmvpe import RMVPE
