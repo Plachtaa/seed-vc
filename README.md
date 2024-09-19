@@ -1,19 +1,21 @@
-# Seed-VC
+# Seed-VC  
+*English | [简体中文](README-CN.md)*  
+
 A new zero-shot voice conversion scheme inspired by SEED-TTS.    
 
-Currently released model supports *zero-shot voice conversion* and *zero-shot singing voice conversion*. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
+Currently released model supports *zero-shot voice conversion* 🔊 and *zero-shot singing voice conversion* 🎙. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
 
-To find a list of demos and comparisons with previous voice conversion models, please visit our [demo page](https://plachtaa.github.io/seed-vc/)  
+To find a list of demos and comparisons with previous voice conversion models, please visit our [demo page](https://plachtaa.github.io/seed-vc/)🌐  
 
 We are keeping on improving the model quality and adding more features.
 
-## Installation
+## Installation📥
 Suggested python 3.10 on Windows or Linux.
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+## Usage🛠️
 Checkpoints of the latest model release will be downloaded automatically when first run inference.  
 
 Command line inference:
@@ -39,13 +41,14 @@ where:
 - `n-quantizers` is the number of quantizers from FAcodec to use, default is 3, the less quantizer used, the less prosody of source audio is preserved  
 - `f0-condition` is the flag to condition the pitch of the output to the pitch of the source audio, default is False, set to True for singing voice conversion  
 - `auto-f0-condition` is the flag to auto adjust source pitch to target pitch level, default is False, normally not used in singing voice conversion
-- `semi-tone-shift` is the pitch shift in semitones for singing voice conversion, default is 0
+- `semi-tone-shift` is the pitch shift in semitones for singing voice conversion, default is 0  
+
 Gradio web interface:
 ```bash
 python app.py
 ```
 Then open the browser and go to `http://localhost:7860/` to use the web interface.
-## TODO
+## TODO📝
 - [x] Release code
 - [x] Release v0.1 pretrained model: [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-SeedVC-blue)](https://huggingface.co/Plachta/Seed-VC)
 - [x] Huggingface space demo: [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)
@@ -60,7 +63,7 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
 - [ ] Code for training on custom data
 - [ ] More to be added
 
-## CHANGELOGS
+## CHANGELOGS🗒️
 - 2024-09-18:
     - Updated f0 conditioned model for singing voice conversion
 - 2024-09-14:
