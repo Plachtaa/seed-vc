@@ -1,4 +1,6 @@
 # Seed-VC
+[![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  
+
 *[English](README.md) | 简体中文*    
 
 一个受 SEED-TTS 启发的新型零样本声音转换方案。    
