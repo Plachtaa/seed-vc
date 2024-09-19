@@ -84,7 +84,7 @@ to_mel = lambda x: mel_spectrogram(x, **mel_fn_args)
 
 # f0 conditioned model
 dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                "DiT_step_404000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
+                                                "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
                                                 "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
 
 config = yaml.safe_load(open(dit_config_path, 'r'))
@@ -113,7 +113,7 @@ def adjust_f0_semitones(f0_sequence, n_semitones):
 
 @torch.no_grad()
 @torch.inference_mode()
-def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift):
+def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift, concat_prompt):
     inference_module = model if not f0_condition else model_f0
     # Load audio
     source_audio = librosa.load(source, sr=sr)[0]
@@ -206,19 +206,24 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     # Length regulation
     cond = inference_module.length_regulator(S_alt, ylens=target_lengths, n_quantizers=int(n_quantizers), f0=shifted_f0_alt)[0]
     prompt_condition = inference_module.length_regulator(S_ori, ylens=target2_lengths, n_quantizers=int(n_quantizers), f0=F0_ori)[0]
-    cat_condition = torch.cat([prompt_condition, cond], dim=1)
+    if concat_prompt:
+        cat_condition = torch.cat([prompt_condition, cond], dim=1)
+    else:
+        cat_condition = cond
+        mel2 = mel2[:, :, mel2.size(-1):]
 
     # Voice Conversion
     vc_target = inference_module.cfm.inference(cat_condition, torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
                                     mel2, style2, None, diffusion_steps, inference_cfg_rate=inference_cfg_rate)
-    vc_target = vc_target[:, :, mel2.size(-1):]
+    if concat_prompt:
+        vc_target = vc_target[:, :, mel2.size(-1):]
 
     # Convert to waveform
-    # if f0_condition:
-    #     f04vocoder = torch.nn.functional.interpolate(shifted_f0_alt.unsqueeze(1), size=vc_target.size(-1),
-    #                                                  mode='nearest').squeeze(1)
-    # else:
-    f04vocoder = None
+    if f0_condition and not auto_f0_adjust and pitch_shift == 0:
+        f04vocoder = torch.nn.functional.interpolate(F0_ori.unsqueeze(1), size=vc_target.size(-1),
+                                                     mode='nearest').squeeze(1)
+    else:
+        f04vocoder = None
     vc_wave = hift_gen.inference(vc_target, f0=f04vocoder)
 
     return sr, vc_wave.squeeze(0).cpu().numpy()
@@ -237,11 +242,13 @@ if __name__ == "__main__":
         gr.Checkbox(label="Auto F0 adjust", value=True,
                     info="Roughly adjust F0 to match target voice. Only works when F0 conditioned model is used."),
         gr.Slider(label='Pitch shift', minimum=-24, maximum=24, step=1, value=0, info='Pitch shift in semitones, only works when F0 conditioned model is used'),
+        gr.Checkbox(label="Concat Prompt", value=True,
+                    info="Concat original speech as prompt"),
     ]
 
-    examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0],
+    examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0, True],
                 ["examples/source/Wiz Khalifa,Charlie Puth - See You Again [vocals]_[cut_28sec].wav",
-                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, 3, True, True, 0],]
+                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, 3, True, True, 0, True],]
 
     outputs = gr.Audio(label="Output Audio")
 

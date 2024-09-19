@@ -32,7 +32,7 @@ def load_models(args):
         f0_extractor = None
     else:
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                        "DiT_step_404000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
+                                                        "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
                                                         "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
         # f0 extractor
         from modules.rmvpe import RMVPE
@@ -125,6 +125,7 @@ def main(args):
     sr = mel_fn_args['sampling_rate']
     speech_tokenizer_type = "cosyvoice" if cosyvoice_frontend is not None else "facodec"
     f0_condition = args.f0_condition
+    auto_f0_adjust = args.auto_f0_adjust
     pitch_shift = args.semi_tone_shift
 
     source = args.source
@@ -200,7 +201,8 @@ def main(args):
 
         # shift alt log f0 level to ori log f0 level
         shifted_log_f0_alt = log_f0_alt.clone()
-        shifted_log_f0_alt[F0_alt > 1] = log_f0_alt[F0_alt > 1] - median_log_f0_alt + median_log_f0_ori
+        if auto_f0_adjust:
+            shifted_log_f0_alt[F0_alt > 1] = log_f0_alt[F0_alt > 1] - median_log_f0_alt + median_log_f0_ori
         shifted_f0_alt = torch.exp(shifted_log_f0_alt)
         if pitch_shift != 0:
             shifted_f0_alt[F0_alt > 1] = adjust_f0_semitones(shifted_f0_alt[F0_alt > 1], pitch_shift)
@@ -212,11 +214,6 @@ def main(args):
     # Length regulation
     cond = model.length_regulator(S_alt, ylens=target_lengths, n_quantizers=int(n_quantizers), f0=shifted_f0_alt)[0]
     prompt_condition = model.length_regulator(S_ori, ylens=target2_lengths, n_quantizers=int(n_quantizers), f0=F0_ori)[0]
-    cat_condition = torch.cat([prompt_condition, cond], dim=1)
-
-    # Length regulation
-    cond = model.length_regulator(S_alt, ylens=target_lengths, n_quantizers=int(n_quantizers))[0]
-    prompt_condition = model.length_regulator(S_ori, ylens=target2_lengths, n_quantizers=int(n_quantizers))[0]
     cat_condition = torch.cat([prompt_condition, cond], dim=1)
 
     time_vc_start = time.time()
@@ -248,7 +245,8 @@ if __name__ == "__main__":
     parser.add_argument("--length-adjust", type=float, default=1.0)
     parser.add_argument("--inference-cfg-rate", type=float, default=0.7)
     parser.add_argument("--n-quantizers", type=int, default=3)
-    parser.add_argument("--f0-condition", type=bool, default=True)
+    parser.add_argument("--f0-condition", type=bool, default=False)
+    parser.add_argument("--auto-f0-adjust", type=bool, default=False)
     parser.add_argument("--semi-tone-shift", type=int, default=0)
     args = parser.parse_args()
     main(args)
