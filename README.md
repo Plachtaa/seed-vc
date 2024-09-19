@@ -1,8 +1,14 @@
 # Seed-VC
-Zero-shot voice conversion trained according to the scheme described in SEED-TTS.  
-The VC quality is surprisingly good in terms of both audio quality and timbre similarity. We decide to continue along this pathway see where it can achieve.  
+A new zero-shot voice conversion scheme inspired by SEED-TTS.    
+
+Currently released model supports *zero-shot voice conversion* and *zero-shot singing voice conversion*. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
+
+To find a list of demos and comparisons with previous voice conversion models, please visit our [demo page](https://plachtaa.github.io/seed-vc/)  
+
+We are keeping on improving the model quality and adding more features.
 
 ## Installation
+Suggested python 3.10 on Windows or Linux.
 ```bash
 pip install -r requirements.txt
 ```
