@@ -113,15 +113,15 @@ def adjust_f0_semitones(f0_sequence, n_semitones):
 
 @torch.no_grad()
 @torch.inference_mode()
-def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift, concat_prompt):
+def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift, concat_prompt,seconds=30):
     inference_module = model if not f0_condition else model_f0
     # Load audio
     source_audio = librosa.load(source, sr=sr)[0]
     ref_audio = librosa.load(target, sr=sr)[0]
 
     # Process audio
-    source_audio = torch.tensor(source_audio[:sr * 30]).unsqueeze(0).float().to(device)
-    ref_audio = torch.tensor(ref_audio[:sr * 30]).unsqueeze(0).float().to(device)
+    source_audio = torch.tensor(source_audio[:sr * seconds]).unsqueeze(0).float().to(device)
+    ref_audio = torch.tensor(ref_audio[:sr * seconds]).unsqueeze(0).float().to(device)
 
     # Resample
     source_waves_16k = torchaudio.functional.resample(source_audio, sr, 16000)
@@ -244,6 +244,7 @@ if __name__ == "__main__":
         gr.Slider(label='Pitch shift', minimum=-24, maximum=24, step=1, value=0, info='Pitch shift in semitones, only works when F0 conditioned model is used'),
         gr.Checkbox(label="Concat Prompt", value=True,
                     info="Concat original speech as prompt"),
+        gr.Slider(minimum=30, maximum=120, value=30, step=1, label="Generated audio length, in seconds", info="Please note that the larger the length of the audio, the slower the inference speed and may cause problems such as memory overflow"),
     ]
 
     examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0, True],
