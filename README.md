@@ -63,6 +63,7 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
     - [x] U-ViT style skip connections
     - [x] Changed input to [FAcodec](https://github.com/Plachtaa/FAcodec) tokens
 - [ ] Code for training on custom data
+- [ ] Retrain NSF Hifi-GAN for singing voice decoding
 - [ ] More to be added
 
 ## CHANGELOGS🗒️

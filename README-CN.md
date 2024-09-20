@@ -63,6 +63,7 @@ python app.py
     - [x] 类似U-ViT 的skip connection
     - [x] 将输入更改为 [FAcodec](https://github.com/Plachtaa/FAcodec) tokens
 - [ ] 自定义数据训练代码
+- [ ] 重新训练 NSF Hifi-GAN 用于歌声解码
 - [ ] 更多待添加
 
 ## 更新日志 🗒️
