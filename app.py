@@ -5,6 +5,8 @@ import librosa
 from modules.commons import build_model, load_checkpoint, recursive_munch
 import yaml
 from hf_utils import load_custom_model_from_hf
+import numpy as np
+from pydub import AudioSegment
 
 # Load model and configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -111,17 +113,29 @@ def adjust_f0_semitones(f0_sequence, n_semitones):
     factor = 2 ** (n_semitones / 12)
     return f0_sequence * factor
 
+def crossfade(chunk1, chunk2, overlap):
+    fade_out = np.cos(np.linspace(0, np.pi / 2, overlap)) ** 2
+    fade_in = np.cos(np.linspace(np.pi / 2, 0, overlap)) ** 2
+    chunk2[:overlap] = chunk2[:overlap] * fade_in + chunk1[-overlap:] * fade_out
+    return chunk2
+
+# streaming and chunk processing related params
+max_context_window = sr // hop_length * 30
+overlap_frame_len = 64
+overlap_wave_len = overlap_frame_len * hop_length
+bitrate = "320k"
+
 @torch.no_grad()
 @torch.inference_mode()
-def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift, concat_prompt,seconds=30):
+def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift):
     inference_module = model if not f0_condition else model_f0
     # Load audio
     source_audio = librosa.load(source, sr=sr)[0]
     ref_audio = librosa.load(target, sr=sr)[0]
 
     # Process audio
-    source_audio = torch.tensor(source_audio[:sr * seconds]).unsqueeze(0).float().to(device)
-    ref_audio = torch.tensor(ref_audio[:sr * seconds]).unsqueeze(0).float().to(device)
+    source_audio = torch.tensor(source_audio).unsqueeze(0).float().to(device)
+    ref_audio = torch.tensor(ref_audio[:sr * 25]).unsqueeze(0).float().to(device)
 
     # Resample
     source_waves_16k = torchaudio.functional.resample(source_audio, sr, 16000)
@@ -133,17 +147,24 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
         S_ori = cosyvoice_frontend.extract_speech_token(ref_waves_16k)[0]
     elif speech_tokenizer_type == 'facodec':
         converted_waves_24k = torchaudio.functional.resample(source_audio, sr, 24000)
-        wave_lengths_24k = torch.LongTensor([converted_waves_24k.size(1)]).to(converted_waves_24k.device)
         waves_input = converted_waves_24k.unsqueeze(1)
-        z = codec_encoder.encoder(waves_input)
-        (
-            quantized,
-            codes
-        ) = codec_encoder.quantizer(
-            z,
-            waves_input,
-        )
-        S_alt = torch.cat([codes[1], codes[0]], dim=1)
+        max_wave_len_per_chunk = 24000 * 20
+        wave_input_chunks = [
+            waves_input[..., i:i + max_wave_len_per_chunk] for i in range(0, waves_input.size(-1), max_wave_len_per_chunk)
+        ]
+        S_alt_chunks = []
+        for i, chunk in enumerate(wave_input_chunks):
+            z = codec_encoder.encoder(chunk)
+            (
+                quantized,
+                codes
+            ) = codec_encoder.quantizer(
+                z,
+                chunk,
+            )
+            S_alt = torch.cat([codes[1], codes[0]], dim=1)
+            S_alt_chunks.append(S_alt)
+        S_alt = torch.cat(S_alt_chunks, dim=-1)
 
         # S_ori should be extracted in the same way
         waves_24k = torchaudio.functional.resample(ref_audio, sr, 24000)
@@ -206,31 +227,72 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     # Length regulation
     cond = inference_module.length_regulator(S_alt, ylens=target_lengths, n_quantizers=int(n_quantizers), f0=shifted_f0_alt)[0]
     prompt_condition = inference_module.length_regulator(S_ori, ylens=target2_lengths, n_quantizers=int(n_quantizers), f0=F0_ori)[0]
-    if concat_prompt:
-        cat_condition = torch.cat([prompt_condition, cond], dim=1)
-    else:
-        cat_condition = cond
-        mel2 = mel2[:, :, mel2.size(-1):]
 
-    # Voice Conversion
-    vc_target = inference_module.cfm.inference(cat_condition, torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
-                                    mel2, style2, None, diffusion_steps, inference_cfg_rate=inference_cfg_rate)
-    if concat_prompt:
+    max_source_window = max_context_window - mel2.size(2)
+    # split source condition (cond) into chunks
+    processed_frames = 0
+    generated_wave_chunks = []
+    # generate chunk by chunk and stream the output
+    while processed_frames < cond.size(1):
+        chunk_cond = cond[:, processed_frames:processed_frames + max_source_window]
+        is_last_chunk = processed_frames + max_source_window >= cond.size(1)
+        cat_condition = torch.cat([prompt_condition, chunk_cond], dim=1)
+        # Voice Conversion
+        vc_target = inference_module.cfm.inference(cat_condition,
+                                                   torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
+                                                   mel2, style2, None, diffusion_steps,
+                                                   inference_cfg_rate=inference_cfg_rate)
         vc_target = vc_target[:, :, mel2.size(-1):]
-
-    # Convert to waveform
-    if f0_condition and not auto_f0_adjust and pitch_shift == 0:
-        f04vocoder = torch.nn.functional.interpolate(F0_ori.unsqueeze(1), size=vc_target.size(-1),
-                                                     mode='nearest').squeeze(1)
-    else:
-        f04vocoder = None
-    vc_wave = hift_gen.inference(vc_target, f0=f04vocoder)
-
-    return sr, vc_wave.squeeze(0).cpu().numpy()
+        vc_wave = hift_gen.inference(vc_target, f0=None)
+        if processed_frames == 0:
+            if is_last_chunk:
+                output_wave = vc_wave[0].cpu().numpy()
+                generated_wave_chunks.append(output_wave)
+                output_wave = (output_wave * 32768.0).astype(np.int16)
+                mp3_bytes = AudioSegment(
+                    output_wave.tobytes(), frame_rate=sr,
+                    sample_width=output_wave.dtype.itemsize, channels=1
+                ).export(format="mp3", bitrate=bitrate).read()
+                yield mp3_bytes
+                break
+            output_wave = vc_wave[0, :-overlap_wave_len].cpu().numpy()
+            generated_wave_chunks.append(output_wave)
+            previous_chunk = vc_wave[0, -overlap_wave_len:]
+            processed_frames += vc_target.size(2) - overlap_frame_len
+            output_wave = (output_wave * 32768.0).astype(np.int16)
+            mp3_bytes = AudioSegment(
+                output_wave.tobytes(), frame_rate=sr,
+                sample_width=output_wave.dtype.itemsize, channels=1
+            ).export(format="mp3", bitrate=bitrate).read()
+            yield mp3_bytes
+        elif is_last_chunk:
+            output_wave = crossfade(previous_chunk.cpu().numpy(), vc_wave[0].cpu().numpy(), overlap_wave_len)
+            generated_wave_chunks.append(output_wave)
+            processed_frames += vc_target.size(2) - overlap_frame_len
+            output_wave = (output_wave * 32768.0).astype(np.int16)
+            mp3_bytes = AudioSegment(
+                output_wave.tobytes(), frame_rate=sr,
+                sample_width=output_wave.dtype.itemsize, channels=1
+            ).export(format="mp3", bitrate=bitrate).read()
+            yield mp3_bytes
+            break
+        else:
+            output_wave = crossfade(previous_chunk.cpu().numpy(), vc_wave[0, :-overlap_wave_len].cpu().numpy(), overlap_wave_len)
+            generated_wave_chunks.append(output_wave)
+            previous_chunk = vc_wave[0, -overlap_wave_len:]
+            processed_frames += vc_target.size(2) - overlap_frame_len
+            output_wave = (output_wave * 32768.0).astype(np.int16)
+            mp3_bytes = AudioSegment(
+                output_wave.tobytes(), frame_rate=sr,
+                sample_width=output_wave.dtype.itemsize, channels=1
+            ).export(format="mp3", bitrate=bitrate).read()
+            yield mp3_bytes
 
 
 if __name__ == "__main__":
-    description = "Zero-shot voice conversion with in-context learning. Check out our [GitHub repository](https://github.com/Plachtaa/seed-vc) for details and updates."
+    description = ("Zero-shot voice conversion with in-context learning. Check out our [GitHub repository](https://github.com/Plachtaa/seed-vc) "
+                   "for details and updates.<br>Note that any reference audio will be forcefully clipped to 25s if beyond this length.<br> "
+                   "If total duration of source and reference audio exceeds 30s, source audio will be processed in chunks.")
     inputs = [
         gr.Audio(type="filepath", label="Source Audio"),
         gr.Audio(type="filepath", label="Reference Audio"),
@@ -242,16 +304,13 @@ if __name__ == "__main__":
         gr.Checkbox(label="Auto F0 adjust", value=True,
                     info="Roughly adjust F0 to match target voice. Only works when F0 conditioned model is used."),
         gr.Slider(label='Pitch shift', minimum=-24, maximum=24, step=1, value=0, info='Pitch shift in semitones, only works when F0 conditioned model is used'),
-        gr.Checkbox(label="Concat Prompt", value=True,
-                    info="Concat original speech as prompt"),
-        gr.Slider(minimum=30, maximum=120, value=30, step=1, label="Maximum allowed audio length, in seconds", info="Please note that the larger the length of the audio, the slower the inference speed and may cause memory overflow or performance degradation"),
     ]
 
-    examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0, True],
+    examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0],
                 ["examples/source/Wiz Khalifa,Charlie Puth - See You Again [vocals]_[cut_28sec].wav",
-                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, 3, True, True, 0, True],]
+                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, 3, True, True, 0],]
 
-    outputs = gr.Audio(label="Output Audio")
+    outputs = gr.Audio(label="Output Audio", streaming=True, format='mp3')
 
     gr.Interface(fn=voice_conversion,
                  description=description,
