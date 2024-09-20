@@ -244,7 +244,7 @@ if __name__ == "__main__":
         gr.Slider(label='Pitch shift', minimum=-24, maximum=24, step=1, value=0, info='Pitch shift in semitones, only works when F0 conditioned model is used'),
         gr.Checkbox(label="Concat Prompt", value=True,
                     info="Concat original speech as prompt"),
-        gr.Slider(minimum=30, maximum=120, value=30, step=1, label="Generated audio length, in seconds", info="Please note that the larger the length of the audio, the slower the inference speed and may cause problems such as memory overflow"),
+        gr.Slider(minimum=30, maximum=120, value=30, step=1, label="Maximum allowed audio length, in seconds", info="Please note that the larger the length of the audio, the slower the inference speed and may cause memory overflow or performance degradation"),
     ]
 
     examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0, True],
