@@ -6,6 +6,8 @@ import torch.nn.functional as F
 from modules.diffusion_transformer import DiT
 from modules.commons import sequence_mask
 
+from tqdm import tqdm
+
 class BASECFM(torch.nn.Module, ABC):
     def __init__(
         self,
@@ -76,7 +78,7 @@ class BASECFM(torch.nn.Module, ABC):
         x[..., :prompt_len] = 0
         if self.zero_prompt_speech_token:
             mu[..., :prompt_len] = 0
-        for step in range(1, len(t_span)):
+        for step in tqdm(range(1, len(t_span))):
             dphi_dt = self.estimator(x, prompt_x, x_lens, t.unsqueeze(0), style, mu, f0)
             # Classifier-Free Guidance inference introduced in VoiceBox
             if inference_cfg_rate > 0:

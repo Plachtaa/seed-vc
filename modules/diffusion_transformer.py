@@ -106,7 +106,7 @@ class DiT(torch.nn.Module):
         self.style_as_token = args.DiT.style_as_token if hasattr(args.DiT, 'style_as_token') else False
         self.uvit_skip_connection = args.DiT.uvit_skip_connection if hasattr(args.DiT, 'uvit_skip_connection') else False
         model_args = ModelArgs(
-            block_size=8192,#args.DiT.block_size,
+            block_size=16384,#args.DiT.block_size,
             n_layer=args.DiT.depth,
             n_head=args.DiT.num_heads,
             dim=args.DiT.hidden_dim,
@@ -139,7 +139,7 @@ class DiT(torch.nn.Module):
         # self.style_embedder1 = weight_norm(nn.Linear(1024, args.DiT.hidden_dim, bias=True))
         # self.style_embedder2 = weight_norm(nn.Linear(1024, args.style_encoder.dim, bias=True))
 
-        input_pos = torch.arange(8192)
+        input_pos = torch.arange(16384)
         self.register_buffer("input_pos", input_pos)
 
         self.conv1 = nn.Linear(args.DiT.hidden_dim, args.wavenet.hidden_dim)
