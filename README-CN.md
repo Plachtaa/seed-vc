@@ -63,10 +63,13 @@ python app.py
     - [x] 类似U-ViT 的skip connection
     - [x] 将输入更改为 [FAcodec](https://github.com/Plachtaa/FAcodec) tokens
 - [ ] 自定义数据训练代码
-- [ ] 重新训练 NSF Hifi-GAN 用于歌声解码
+- [x] 歌声解码器更改为 NVIDIA 的 BigVGAN
 - [ ] 更多待添加
 
 ## 更新日志 🗒️
+- 2024-09-22:
+    - 将歌声转换模型的解码器更改为 BigVGAN，解决了大部分高音部分无法正确转换的问题
+    - 在Web UI中支持对长输入音频的分段处理以及流式输出
 - 2024-09-18:
     - 更新了用于歌声转换的模型
 - 2024-09-14:

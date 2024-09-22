@@ -31,9 +31,11 @@ def load_models(args):
                                                         "config_dit_mel_seed_facodec_small_wavenet.yml")
         f0_extractor = None
     else:
-        dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                        "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
-                                                        "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
+        # dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+        #                                                 "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
+        #                                                 "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
+        dit_checkpoint_path = "E:/DiT_epoch_00020_step_500000__seed_v2_uvit_facodec_small_wavenet_f0_bigvgan.pth"
+        dit_config_path = "configs/config_dit_mel_seed_facodec_small_wavenet_f0.yml"
         # f0 extractor
         from modules.rmvpe import RMVPE
 
@@ -75,6 +77,13 @@ def load_models(args):
     hift_gen.eval()
     hift_gen.to(device)
 
+    from modules.bigvgan import bigvgan
+    bigvgan_model = bigvgan.BigVGAN.from_pretrained('nvidia/bigvgan_v2_22khz_80band_256x', use_cuda_kernel=False)
+
+    # remove weight norm in the model and set to eval mode
+    bigvgan_model.remove_weight_norm()
+    bigvgan_model = bigvgan_model.eval().to(device)
+
     speech_tokenizer_type = config['model_params']['speech_tokenizer'].get('type', 'cosyvoice')
     if speech_tokenizer_type == 'cosyvoice':
         from modules.cosyvoice_tokenizer.frontend import CosyVoiceFrontEnd
@@ -105,14 +114,14 @@ def load_models(args):
         "num_mels": config['preprocess_params']['spect_params']['n_mels'],
         "sampling_rate": sr,
         "fmin": 0,
-        "fmax": 8000,
+        "fmax": None if args.f0_condition else 8000,
         "center": False
     }
     from modules.audio import mel_spectrogram
 
     to_mel = lambda x: mel_spectrogram(x, **mel_fn_args)
 
-    return model, codec_encoder, cosyvoice_frontend, f0_extractor, hift_gen, campplus_model, to_mel, mel_fn_args
+    return model, codec_encoder, cosyvoice_frontend, f0_extractor, hift_gen, bigvgan_model, campplus_model, to_mel, mel_fn_args
 
 def adjust_f0_semitones(f0_sequence, n_semitones):
     factor = 2 ** (n_semitones / 12)
@@ -121,7 +130,7 @@ def adjust_f0_semitones(f0_sequence, n_semitones):
 @torch.no_grad()
 def main(args):
 
-    model, codec_encoder, cosyvoice_frontend, f0_extractor, hift_gen, campplus_model, to_mel, mel_fn_args = load_models(args)
+    model, codec_encoder, cosyvoice_frontend, f0_extractor, hift_gen, bigvgan_model, campplus_model, to_mel, mel_fn_args = load_models(args)
     sr = mel_fn_args['sampling_rate']
     speech_tokenizer_type = "cosyvoice" if cosyvoice_frontend is not None else "facodec"
     f0_condition = args.f0_condition
@@ -196,9 +205,6 @@ def main(args):
         voiced_log_f0_alt = torch.log(voiced_F0_alt + 1e-5)
         median_log_f0_ori = torch.median(voiced_log_f0_ori)
         median_log_f0_alt = torch.median(voiced_log_f0_alt)
-        # mean_log_f0_ori = torch.mean(voiced_log_f0_ori)
-        # mean_log_f0_alt = torch.mean(voiced_log_f0_alt)
-
         # shift alt log f0 level to ori log f0 level
         shifted_log_f0_alt = log_f0_alt.clone()
         if auto_f0_adjust:
@@ -225,7 +231,10 @@ def main(args):
     vc_target = vc_target[:, :, mel2.size(-1):]
 
     # Convert to waveform
-    vc_wave = hift_gen.inference(vc_target)
+    if f0_condition:
+        vc_wave = bigvgan_model(vc_target).squeeze(1)  # wav_gen is FloatTensor with shape [B(1), 1, T_time] and values in [-1, 1]
+    else:
+        vc_wave = hift_gen.inference(vc_target, f0=None)
 
     time_vc_end = time.time()
     print(f"RTF: {(time_vc_end - time_vc_start) / vc_wave.size(-1) * sr}")
@@ -241,11 +250,11 @@ if __name__ == "__main__":
     parser.add_argument("--source", type=str, default="./examples/source/source_s1.wav")
     parser.add_argument("--target", type=str, default="./examples/reference/s1p1.wav")
     parser.add_argument("--output", type=str, default="./reconstructed")
-    parser.add_argument("--diffusion-steps", type=int, default=10)
+    parser.add_argument("--diffusion-steps", type=int, default=50)
     parser.add_argument("--length-adjust", type=float, default=1.0)
     parser.add_argument("--inference-cfg-rate", type=float, default=0.7)
     parser.add_argument("--n-quantizers", type=int, default=3)
-    parser.add_argument("--f0-condition", type=bool, default=False)
+    parser.add_argument("--f0-condition", type=bool, default=True)
     parser.add_argument("--auto-f0-adjust", type=bool, default=False)
     parser.add_argument("--semi-tone-shift", type=int, default=0)
     args = parser.parse_args()

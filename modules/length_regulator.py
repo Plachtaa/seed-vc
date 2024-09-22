@@ -3,7 +3,26 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from modules.commons import sequence_mask
+import numpy as np
 
+# f0_bin = 256
+f0_max = 1100.0
+f0_min = 50.0
+f0_mel_min = 1127 * np.log(1 + f0_min / 700)
+f0_mel_max = 1127 * np.log(1 + f0_max / 700)
+
+def f0_to_coarse(f0, f0_bin):
+  f0_mel = 1127 * (1 + f0 / 700).log()
+  a = (f0_bin - 2) / (f0_mel_max - f0_mel_min)
+  b = f0_mel_min * a - 1.
+  f0_mel = torch.where(f0_mel > 0, f0_mel * a - b, f0_mel)
+  # torch.clip_(f0_mel, min=1., max=float(f0_bin - 1))
+  f0_coarse = torch.round(f0_mel).long()
+  f0_coarse = f0_coarse * (f0_coarse > 0)
+  f0_coarse = f0_coarse + ((f0_coarse < 1) * 1)
+  f0_coarse = f0_coarse * (f0_coarse < f0_bin)
+  f0_coarse = f0_coarse + ((f0_coarse >= f0_bin) * (f0_bin - 1))
+  return f0_coarse
 
 class InterpolateRegulator(nn.Module):
     def __init__(
@@ -88,13 +107,10 @@ class InterpolateRegulator(nn.Module):
             if f0 is None:
                 x = x + self.f0_mask.unsqueeze(-1)
             else:
-                quantized_f0 = torch.bucketize(f0, self.f0_bins.to(f0.device))  # (N, T)
-                if self.training:
-                    drop_f0 = torch.rand(quantized_f0.size(0)).to(f0.device) < self.quantizer_dropout
-                else:
-                    drop_f0 = torch.zeros(quantized_f0.size(0)).to(f0.device).bool()
+                # quantized_f0 = torch.bucketize(f0, self.f0_bins.to(f0.device))  # (N, T)
+                quantized_f0 = f0_to_coarse(f0, self.n_f0_bins)
+                quantized_f0 = quantized_f0.clamp(0, self.n_f0_bins - 1).long()
                 f0_emb = self.f0_embedding(quantized_f0)
-                f0_emb[drop_f0] = self.f0_mask
                 f0_emb = F.interpolate(f0_emb.transpose(1, 2).contiguous(), size=ylens.max(), mode='nearest')
                 x = x + f0_emb
         out = self.model(x).transpose(1, 2).contiguous()

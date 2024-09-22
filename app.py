@@ -50,6 +50,14 @@ hift_gen.load_state_dict(torch.load(hift_checkpoint_path, map_location='cpu'))
 hift_gen.eval()
 hift_gen.to(device)
 
+from modules.bigvgan import bigvgan
+
+bigvgan_model = bigvgan.BigVGAN.from_pretrained('nvidia/bigvgan_v2_22khz_80band_256x', use_cuda_kernel=False)
+
+# remove weight norm in the model and set to eval mode
+bigvgan_model.remove_weight_norm()
+bigvgan_model = bigvgan_model.eval().to(device)
+
 speech_tokenizer_type = config['model_params']['speech_tokenizer'].get('type', 'cosyvoice')
 if speech_tokenizer_type == 'cosyvoice':
     from modules.cosyvoice_tokenizer.frontend import CosyVoiceFrontEnd
@@ -69,6 +77,7 @@ elif speech_tokenizer_type == 'facodec':
         codec_encoder[key].load_state_dict(ckpt_params[key], strict=False)
     _ = [codec_encoder[key].eval() for key in codec_encoder]
     _ = [codec_encoder[key].to(device) for key in codec_encoder]
+
 # Generate mel spectrograms
 mel_fn_args = {
     "n_fft": config['preprocess_params']['spect_params']['n_fft'],
@@ -80,13 +89,24 @@ mel_fn_args = {
     "fmax": 8000,
     "center": False
 }
+mel_fn_args_f0 = {
+    "n_fft": config['preprocess_params']['spect_params']['n_fft'],
+    "win_size": config['preprocess_params']['spect_params']['win_length'],
+    "hop_size": config['preprocess_params']['spect_params']['hop_length'],
+    "num_mels": config['preprocess_params']['spect_params']['n_mels'],
+    "sampling_rate": sr,
+    "fmin": 0,
+    "fmax": None,
+    "center": False
+}
 from modules.audio import mel_spectrogram
 
 to_mel = lambda x: mel_spectrogram(x, **mel_fn_args)
+to_mel_f0 = lambda x: mel_spectrogram(x, **mel_fn_args_f0)
 
 # f0 conditioned model
 dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
+                                                "DiT_seed_v2_uvit_facodec_small_wavenet_f0_bigvgan_pruned.pth",
                                                 "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
 
 config = yaml.safe_load(open(dit_config_path, 'r'))
@@ -114,8 +134,8 @@ def adjust_f0_semitones(f0_sequence, n_semitones):
     return f0_sequence * factor
 
 def crossfade(chunk1, chunk2, overlap):
-    fade_out = np.cos(np.linspace(0, np.pi / 2, overlap)) ** 2
-    fade_in = np.cos(np.linspace(np.pi / 2, 0, overlap)) ** 2
+    fade_out = np.linspace(1, 0, overlap)
+    fade_in = np.linspace(0, 1, overlap)
     chunk2[:overlap] = chunk2[:overlap] * fade_in + chunk1[-overlap:] * fade_out
     return chunk2
 
@@ -129,6 +149,7 @@ bitrate = "320k"
 @torch.inference_mode()
 def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift):
     inference_module = model if not f0_condition else model_f0
+    mel_fn = to_mel if not f0_condition else to_mel_f0
     # Load audio
     source_audio = librosa.load(source, sr=sr)[0]
     ref_audio = librosa.load(target, sr=sr)[0]
@@ -179,8 +200,8 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
         )
         S_ori = torch.cat([codes[1], codes[0]], dim=1)
 
-    mel = to_mel(source_audio.to(device).float())
-    mel2 = to_mel(ref_audio.to(device).float())
+    mel = mel_fn(source_audio.to(device).float())
+    mel2 = mel_fn(ref_audio.to(device).float())
 
     target_lengths = torch.LongTensor([int(mel.size(2) * length_adjust)]).to(mel.device)
     target2_lengths = torch.LongTensor([mel2.size(2)]).to(mel2.device)
@@ -193,8 +214,8 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     style2 = campplus_model(feat2.unsqueeze(0))
 
     if f0_condition:
-        waves_16k = torchaudio.functional.resample(waves_24k, sr, 16000)
-        converted_waves_16k = torchaudio.functional.resample(converted_waves_24k, sr, 16000)
+        waves_16k = torchaudio.functional.resample(waves_24k, 24000, 16000)
+        converted_waves_16k = torchaudio.functional.resample(converted_waves_24k, 24000, 16000)
         F0_ori = rmvpe.infer_from_audio(waves_16k[0], thred=0.03)
         F0_alt = rmvpe.infer_from_audio(converted_waves_16k[0], thred=0.03)
 
@@ -243,7 +264,10 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                                                    mel2, style2, None, diffusion_steps,
                                                    inference_cfg_rate=inference_cfg_rate)
         vc_target = vc_target[:, :, mel2.size(-1):]
-        vc_wave = hift_gen.inference(vc_target, f0=None)
+        if not f0_condition:
+            vc_wave = hift_gen.inference(vc_target, f0=None)
+        else:
+            vc_wave = bigvgan_model(vc_target)[0]
         if processed_frames == 0:
             if is_last_chunk:
                 output_wave = vc_wave[0].cpu().numpy()
@@ -253,7 +277,7 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                     output_wave.tobytes(), frame_rate=sr,
                     sample_width=output_wave.dtype.itemsize, channels=1
                 ).export(format="mp3", bitrate=bitrate).read()
-                yield mp3_bytes
+                yield mp3_bytes, (sr, np.concatenate(generated_wave_chunks))
                 break
             output_wave = vc_wave[0, :-overlap_wave_len].cpu().numpy()
             generated_wave_chunks.append(output_wave)
@@ -264,7 +288,7 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                 output_wave.tobytes(), frame_rate=sr,
                 sample_width=output_wave.dtype.itemsize, channels=1
             ).export(format="mp3", bitrate=bitrate).read()
-            yield mp3_bytes
+            yield mp3_bytes, None
         elif is_last_chunk:
             output_wave = crossfade(previous_chunk.cpu().numpy(), vc_wave[0].cpu().numpy(), overlap_wave_len)
             generated_wave_chunks.append(output_wave)
@@ -274,7 +298,7 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                 output_wave.tobytes(), frame_rate=sr,
                 sample_width=output_wave.dtype.itemsize, channels=1
             ).export(format="mp3", bitrate=bitrate).read()
-            yield mp3_bytes
+            yield mp3_bytes, (sr, np.concatenate(generated_wave_chunks))
             break
         else:
             output_wave = crossfade(previous_chunk.cpu().numpy(), vc_wave[0, :-overlap_wave_len].cpu().numpy(), overlap_wave_len)
@@ -286,7 +310,7 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                 output_wave.tobytes(), frame_rate=sr,
                 sample_width=output_wave.dtype.itemsize, channels=1
             ).export(format="mp3", bitrate=bitrate).read()
-            yield mp3_bytes
+            yield mp3_bytes, None
 
 
 if __name__ == "__main__":
@@ -307,10 +331,15 @@ if __name__ == "__main__":
     ]
 
     examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0],
+                ["examples/source/jay_0.wav", "examples/reference/azuma_0.wav", 25, 1.0, 0.7, 1, True, True, 0],
                 ["examples/source/Wiz Khalifa,Charlie Puth - See You Again [vocals]_[cut_28sec].wav",
-                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, 3, True, True, 0],]
+                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, 3, True, False, 0],
+                ["examples/source/TECHNOPOLIS - 2085 [vocals]_[cut_14sec].wav",
+                 "examples/reference/trump_0.wav", 50, 1.0, 0.7, 3, True, False, -12],
+                ]
 
-    outputs = gr.Audio(label="Output Audio", streaming=True, format='mp3')
+    outputs = [gr.Audio(label="Stream Output Audio", streaming=True, format='mp3'),
+               gr.Audio(label="Full Output Audio", streaming=False, format='wav')]
 
     gr.Interface(fn=voice_conversion,
                  description=description,

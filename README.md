@@ -63,10 +63,13 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
     - [x] U-ViT style skip connections
     - [x] Changed input to [FAcodec](https://github.com/Plachtaa/FAcodec) tokens
 - [ ] Code for training on custom data
-- [ ] Retrain NSF Hifi-GAN for singing voice decoding
+- [x] Changed to BigVGAN from NVIDIA for singing voice decoding
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
+- 2024-09-22:
+    - Updated singing voice conversion model to use BigVGAN from NVIDIA, providing large improvement to high-pitched singing voices
+    - Support chunking and  streaming output for long audio files in Web UI
 - 2024-09-18:
     - Updated f0 conditioned model for singing voice conversion
 - 2024-09-14:
