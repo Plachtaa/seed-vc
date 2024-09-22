@@ -84,28 +84,18 @@ def load_models(args):
     bigvgan_model.remove_weight_norm()
     bigvgan_model = bigvgan_model.eval().to(device)
 
-    speech_tokenizer_type = config['model_params']['speech_tokenizer'].get('type', 'cosyvoice')
-    if speech_tokenizer_type == 'cosyvoice':
-        from modules.cosyvoice_tokenizer.frontend import CosyVoiceFrontEnd
-        speech_tokenizer_path = load_custom_model_from_hf("Plachta/Seed-VC", "speech_tokenizer_v1.onnx", None)
-        cosyvoice_frontend = CosyVoiceFrontEnd(speech_tokenizer_model=speech_tokenizer_path,
-                                               device='cuda', device_id=0)
-        codec_encoder = None
-    elif speech_tokenizer_type == 'facodec':
-        ckpt_path, config_path = load_custom_model_from_hf("Plachta/FAcodec", 'pytorch_model.bin', 'config.yml')
+    ckpt_path, config_path = load_custom_model_from_hf("Plachta/FAcodec", 'pytorch_model.bin', 'config.yml')
 
-        codec_config = yaml.safe_load(open(config_path))
-        codec_model_params = recursive_munch(codec_config['model_params'])
-        codec_encoder = build_model(codec_model_params, stage="codec")
+    codec_config = yaml.safe_load(open(config_path))
+    codec_model_params = recursive_munch(codec_config['model_params'])
+    codec_encoder = build_model(codec_model_params, stage="codec")
 
-        ckpt_params = torch.load(ckpt_path, map_location="cpu")
+    ckpt_params = torch.load(ckpt_path, map_location="cpu")
 
-        for key in codec_encoder:
-            codec_encoder[key].load_state_dict(ckpt_params[key], strict=False)
-        _ = [codec_encoder[key].eval() for key in codec_encoder]
-        _ = [codec_encoder[key].to(device) for key in codec_encoder]
-
-        cosyvoice_frontend = None
+    for key in codec_encoder:
+        codec_encoder[key].load_state_dict(ckpt_params[key], strict=False)
+    _ = [codec_encoder[key].eval() for key in codec_encoder]
+    _ = [codec_encoder[key].to(device) for key in codec_encoder]
     # Generate mel spectrograms
     mel_fn_args = {
         "n_fft": config['preprocess_params']['spect_params']['n_fft'],
@@ -121,7 +111,7 @@ def load_models(args):
 
     to_mel = lambda x: mel_spectrogram(x, **mel_fn_args)
 
-    return model, codec_encoder, cosyvoice_frontend, f0_extractor, hift_gen, bigvgan_model, campplus_model, to_mel, mel_fn_args
+    return model, codec_encoder, f0_extractor, hift_gen, bigvgan_model, campplus_model, to_mel, mel_fn_args
 
 def adjust_f0_semitones(f0_sequence, n_semitones):
     factor = 2 ** (n_semitones / 12)
@@ -130,9 +120,8 @@ def adjust_f0_semitones(f0_sequence, n_semitones):
 @torch.no_grad()
 def main(args):
 
-    model, codec_encoder, cosyvoice_frontend, f0_extractor, hift_gen, bigvgan_model, campplus_model, to_mel, mel_fn_args = load_models(args)
+    model, codec_encoder, f0_extractor, hift_gen, bigvgan_model, campplus_model, to_mel, mel_fn_args = load_models(args)
     sr = mel_fn_args['sampling_rate']
-    speech_tokenizer_type = "cosyvoice" if cosyvoice_frontend is not None else "facodec"
     f0_condition = args.f0_condition
     auto_f0_adjust = args.auto_f0_adjust
     pitch_shift = args.semi_tone_shift
@@ -157,23 +146,19 @@ def main(args):
     source_waves_16k = torchaudio.functional.resample(source_audio, sr, 16000)
     ref_waves_16k = torchaudio.functional.resample(ref_audio, sr, 16000)
 
-    if speech_tokenizer_type == "cosyvoice":
-        S_alt = cosyvoice_frontend.extract_speech_token(source_waves_16k)[0]
-        S_ori = cosyvoice_frontend.extract_speech_token(ref_waves_16k)[0]
-    elif speech_tokenizer_type == "facodec":
-        converted_waves_24k = torchaudio.functional.resample(source_audio, sr, 24000)
-        wave_lengths_24k = torch.LongTensor([converted_waves_24k.size(1)]).to(converted_waves_24k.device)
-        waves_input = converted_waves_24k.unsqueeze(1)
-        z = codec_encoder.encoder(waves_input)
-        (quantized, codes) = codec_encoder.quantizer(z, waves_input)
-        S_alt = torch.cat([codes[1], codes[0]], dim=1)
+    converted_waves_24k = torchaudio.functional.resample(source_audio, sr, 24000)
+    wave_lengths_24k = torch.LongTensor([converted_waves_24k.size(1)]).to(converted_waves_24k.device)
+    waves_input = converted_waves_24k.unsqueeze(1)
+    z = codec_encoder.encoder(waves_input)
+    (quantized, codes) = codec_encoder.quantizer(z, waves_input)
+    S_alt = torch.cat([codes[1], codes[0]], dim=1)
 
-        # S_ori should be extracted in the same way
-        waves_24k = torchaudio.functional.resample(ref_audio, sr, 24000)
-        waves_input = waves_24k.unsqueeze(1)
-        z = codec_encoder.encoder(waves_input)
-        (quantized, codes) = codec_encoder.quantizer(z, waves_input)
-        S_ori = torch.cat([codes[1], codes[0]], dim=1)
+    # S_ori should be extracted in the same way
+    waves_24k = torchaudio.functional.resample(ref_audio, sr, 24000)
+    waves_input = waves_24k.unsqueeze(1)
+    z = codec_encoder.encoder(waves_input)
+    (quantized, codes) = codec_encoder.quantizer(z, waves_input)
+    S_ori = torch.cat([codes[1], codes[0]], dim=1)
 
     mel = to_mel(source_audio.to(device).float())
     mel2 = to_mel(ref_audio.to(device).float())
