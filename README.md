@@ -64,6 +64,7 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
     - [x] Changed input to [FAcodec](https://github.com/Plachtaa/FAcodec) tokens
 - [ ] Code for training on custom data
 - [x] Changed to BigVGAN from NVIDIA for singing voice decoding
+- [ ] 44k Hz model for singing voice conversion of better quality
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
