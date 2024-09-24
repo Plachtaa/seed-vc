@@ -31,11 +31,9 @@ def load_models(args):
                                                         "config_dit_mel_seed_facodec_small_wavenet.yml")
         f0_extractor = None
     else:
-        # dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-        #                                                 "DiT_step_440000_seed_v2_uvit_facodec_small_wavenet_f0_pruned.pth",
-        #                                                 "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
-        dit_checkpoint_path = "E:/DiT_epoch_00020_step_500000__seed_v2_uvit_facodec_small_wavenet_f0_bigvgan.pth"
-        dit_config_path = "configs/config_dit_mel_seed_facodec_small_wavenet_f0.yml"
+        dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+                                                                         "DiT_seed_v2_uvit_facodec_small_wavenet_f0_bigvgan_pruned.pth",
+                                                                         "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
         # f0 extractor
         from modules.rmvpe import RMVPE
 
