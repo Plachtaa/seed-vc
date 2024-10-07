@@ -12,9 +12,8 @@ from pydub import AudioSegment
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                "DiT_step_298000_seed_uvit_facodec_small_wavenet_pruned.pth",
-                                                "config_dit_mel_seed_facodec_small_wavenet.yml")
-
+                                                "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
+                                                "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
 config = yaml.safe_load(open(dit_config_path, 'r'))
 model_params = recursive_munch(config['model_params'])
 model = build_model(model_params, stage='DiT')
@@ -38,18 +37,6 @@ campplus_model.load_state_dict(torch.load(campplus_ckpt_path, map_location="cpu"
 campplus_model.eval()
 campplus_model.to(device)
 
-from modules.hifigan.generator import HiFTGenerator
-from modules.hifigan.f0_predictor import ConvRNNF0Predictor
-
-hift_checkpoint_path, hift_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                "hift.pt",
-                                                "hifigan.yml")
-hift_config = yaml.safe_load(open(hift_config_path, 'r'))
-hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
-hift_gen.load_state_dict(torch.load(hift_checkpoint_path, map_location='cpu'))
-hift_gen.eval()
-hift_gen.to(device)
-
 from modules.bigvgan import bigvgan
 
 bigvgan_model = bigvgan.BigVGAN.from_pretrained('nvidia/bigvgan_v2_22khz_80band_256x', use_cuda_kernel=False)
@@ -71,6 +58,15 @@ for key in codec_encoder:
 _ = [codec_encoder[key].eval() for key in codec_encoder]
 _ = [codec_encoder[key].to(device) for key in codec_encoder]
 
+# whisper
+from transformers import AutoFeatureExtractor, WhisperModel
+
+whisper_name = model_params.speech_tokenizer.whisper_name if hasattr(model_params.speech_tokenizer,
+                                                                     'whisper_name') else "openai/whisper-small"
+whisper_model = WhisperModel.from_pretrained(whisper_name, torch_dtype=torch.float16).to(device)
+del whisper_model.decoder
+whisper_feature_extractor = AutoFeatureExtractor.from_pretrained(whisper_name)
+
 # Generate mel spectrograms
 mel_fn_args = {
     "n_fft": config['preprocess_params']['spect_params']['n_fft'],
@@ -79,7 +75,7 @@ mel_fn_args = {
     "num_mels": config['preprocess_params']['spect_params']['n_mels'],
     "sampling_rate": sr,
     "fmin": 0,
-    "fmax": 8000,
+    "fmax": None,
     "center": False
 }
 mel_fn_args_f0 = {
@@ -140,7 +136,7 @@ bitrate = "320k"
 
 @torch.no_grad()
 @torch.inference_mode()
-def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, n_quantizers, f0_condition, auto_f0_adjust, pitch_shift):
+def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, f0_condition, auto_f0_adjust, pitch_shift):
     inference_module = model if not f0_condition else model_f0
     mel_fn = to_mel if not f0_condition else to_mel_f0
     # Load audio
@@ -155,38 +151,107 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     ref_waves_16k = torchaudio.functional.resample(ref_audio, sr, 16000)
 
     # Extract features
-    converted_waves_24k = torchaudio.functional.resample(source_audio, sr, 24000)
-    waves_input = converted_waves_24k.unsqueeze(1)
-    max_wave_len_per_chunk = 24000 * 20
-    wave_input_chunks = [
-        waves_input[..., i:i + max_wave_len_per_chunk] for i in range(0, waves_input.size(-1), max_wave_len_per_chunk)
-    ]
-    S_alt_chunks = []
-    for i, chunk in enumerate(wave_input_chunks):
-        z = codec_encoder.encoder(chunk)
+    if f0_condition:
+        converted_waves_24k = torchaudio.functional.resample(source_audio, sr, 24000)
+        waves_input = converted_waves_24k.unsqueeze(1)
+        max_wave_len_per_chunk = 24000 * 20
+        wave_input_chunks = [
+            waves_input[..., i:i + max_wave_len_per_chunk] for i in range(0, waves_input.size(-1), max_wave_len_per_chunk)
+        ]
+        S_alt_chunks = []
+        for i, chunk in enumerate(wave_input_chunks):
+            z = codec_encoder.encoder(chunk)
+            (
+                quantized,
+                codes
+            ) = codec_encoder.quantizer(
+                z,
+                chunk,
+            )
+            S_alt = torch.cat([codes[1], codes[0]], dim=1)
+            S_alt_chunks.append(S_alt)
+        S_alt = torch.cat(S_alt_chunks, dim=-1)
+
+        # S_ori should be extracted in the same way
+        waves_24k = torchaudio.functional.resample(ref_audio, sr, 24000)
+        waves_input = waves_24k.unsqueeze(1)
+        z = codec_encoder.encoder(waves_input)
         (
             quantized,
             codes
         ) = codec_encoder.quantizer(
             z,
-            chunk,
+            waves_input,
         )
-        S_alt = torch.cat([codes[1], codes[0]], dim=1)
-        S_alt_chunks.append(S_alt)
-    S_alt = torch.cat(S_alt_chunks, dim=-1)
+        S_ori = torch.cat([codes[1], codes[0]], dim=1)
+    else:
+        converted_waves_16k = torchaudio.functional.resample(source_audio, sr, 16000)
+        # if source audio less than 30 seconds, whisper can handle in one forward
+        if converted_waves_16k.size(-1) <= 16000 * 30:
+            alt_inputs = whisper_feature_extractor([converted_waves_16k.squeeze(0).cpu().numpy()],
+                                                   return_tensors="pt",
+                                                   return_attention_mask=True,
+                                                   sampling_rate=16000)
+            alt_input_features = whisper_model._mask_input_features(
+                alt_inputs.input_features, attention_mask=alt_inputs.attention_mask).to(device)
+            alt_outputs = whisper_model.encoder(
+                alt_input_features.to(whisper_model.encoder.dtype),
+                head_mask=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=True,
+            )
+            S_alt = alt_outputs.last_hidden_state.to(torch.float32)
+            S_alt = S_alt[:, :converted_waves_16k.size(-1) // 320 + 1]
+        else:
+            overlapping_time = 5  # 5 seconds
+            S_alt_list = []
+            buffer = None
+            traversed_time = 0
+            while traversed_time < converted_waves_16k.size(-1):
+                if buffer is None:  # first chunk
+                    chunk = converted_waves_16k[:, traversed_time:traversed_time + 16000 * 30]
+                else:
+                    chunk = torch.cat([buffer, converted_waves_16k[:, traversed_time:traversed_time + 16000 * (30 - overlapping_time)]], dim=-1)
+                alt_inputs = whisper_feature_extractor([chunk.squeeze(0).cpu().numpy()],
+                                                       return_tensors="pt",
+                                                       return_attention_mask=True,
+                                                       sampling_rate=16000)
+                alt_input_features = whisper_model._mask_input_features(
+                    alt_inputs.input_features, attention_mask=alt_inputs.attention_mask).to(device)
+                alt_outputs = whisper_model.encoder(
+                    alt_input_features.to(whisper_model.encoder.dtype),
+                    head_mask=None,
+                    output_attentions=False,
+                    output_hidden_states=False,
+                    return_dict=True,
+                )
+                S_alt = alt_outputs.last_hidden_state.to(torch.float32)
+                S_alt = S_alt[:, :chunk.size(-1) // 320 + 1]
+                if traversed_time == 0:
+                    S_alt_list.append(S_alt)
+                else:
+                    S_alt_list.append(S_alt[:, 50 * overlapping_time:])
+                buffer = chunk[:, -16000 * overlapping_time:]
+                traversed_time += 30 * 16000 if traversed_time == 0 else chunk.size(-1) - 16000 * overlapping_time
+            S_alt = torch.cat(S_alt_list, dim=1)
 
-    # S_ori should be extracted in the same way
-    waves_24k = torchaudio.functional.resample(ref_audio, sr, 24000)
-    waves_input = waves_24k.unsqueeze(1)
-    z = codec_encoder.encoder(waves_input)
-    (
-        quantized,
-        codes
-    ) = codec_encoder.quantizer(
-        z,
-        waves_input,
-    )
-    S_ori = torch.cat([codes[1], codes[0]], dim=1)
+        ori_waves_16k = torchaudio.functional.resample(ref_audio, sr, 16000)
+        ori_inputs = whisper_feature_extractor([ori_waves_16k.squeeze(0).cpu().numpy()],
+                                               return_tensors="pt",
+                                               return_attention_mask=True)
+        ori_input_features = whisper_model._mask_input_features(
+            ori_inputs.input_features, attention_mask=ori_inputs.attention_mask).to(device)
+        with torch.no_grad():
+            ori_outputs = whisper_model.encoder(
+                ori_input_features.to(whisper_model.encoder.dtype),
+                head_mask=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=True,
+            )
+        S_ori = ori_outputs.last_hidden_state.to(torch.float32)
+        S_ori = S_ori[:, :ori_waves_16k.size(-1) // 320 + 1]
 
     mel = mel_fn(source_audio.to(device).float())
     mel2 = mel_fn(ref_audio.to(device).float())
@@ -234,8 +299,8 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
         shifted_f0_alt = None
 
     # Length regulation
-    cond = inference_module.length_regulator(S_alt, ylens=target_lengths, n_quantizers=int(n_quantizers), f0=shifted_f0_alt)[0]
-    prompt_condition = inference_module.length_regulator(S_ori, ylens=target2_lengths, n_quantizers=int(n_quantizers), f0=F0_ori)[0]
+    cond, _, codes, commitment_loss, codebook_loss = inference_module.length_regulator(S_alt, ylens=target_lengths, n_quantizers=3, f0=shifted_f0_alt)
+    prompt_condition, _, codes, commitment_loss, codebook_loss = inference_module.length_regulator(S_ori, ylens=target2_lengths, n_quantizers=3, f0=F0_ori)
 
     max_source_window = max_context_window - mel2.size(2)
     # split source condition (cond) into chunks
@@ -252,10 +317,7 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                                                    mel2, style2, None, diffusion_steps,
                                                    inference_cfg_rate=inference_cfg_rate)
         vc_target = vc_target[:, :, mel2.size(-1):]
-        if not f0_condition:
-            vc_wave = hift_gen.inference(vc_target, f0=None)
-        else:
-            vc_wave = bigvgan_model(vc_target)[0]
+        vc_wave = bigvgan_model(vc_target)[0]
         if processed_frames == 0:
             if is_last_chunk:
                 output_wave = vc_wave[0].cpu().numpy()
@@ -313,19 +375,18 @@ if __name__ == "__main__":
         gr.Slider(minimum=1, maximum=200, value=10, step=1, label="Diffusion Steps / 扩散步数", info="10 by default, 50~100 for best quality / 默认为 10，50~100 为最佳质量"),
         gr.Slider(minimum=0.5, maximum=2.0, step=0.1, value=1.0, label="Length Adjust / 长度调整", info="<1.0 for speed-up speech, >1.0 for slow-down speech / <1.0 加速语速，>1.0 减慢语速"),
         gr.Slider(minimum=0.0, maximum=1.0, step=0.1, value=0.7, label="Inference CFG Rate", info="has subtle influence / 有微小影响"),
-        gr.Slider(minimum=1, maximum=3, step=1, value=3, label="N FAcodec Quantizers / FAcodec码本数量", info="the less FAcodec quantizer used, the less prosody of source audio is preserved / 使用的FAcodec码本越少，源音频的韵律保留越少"),
         gr.Checkbox(label="Use F0 conditioned model / 启用F0输入", value=False, info="Must set to true for singing voice conversion / 歌声转换时必须勾选"),
         gr.Checkbox(label="Auto F0 adjust / 自动F0调整", value=True,
                     info="Roughly adjust F0 to match target voice. Only works when F0 conditioned model is used. / 粗略调整 F0 以匹配目标音色，仅在勾选 '启用F0输入' 时生效"),
         gr.Slider(label='Pitch shift / 音调变换', minimum=-24, maximum=24, step=1, value=0, info="Pitch shift in semitones, only works when F0 conditioned model is used / 半音数的音高变换，仅在勾选 '启用F0输入' 时生效"),
     ]
 
-    examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, 1, False, True, 0],
-                ["examples/source/jay_0.wav", "examples/reference/azuma_0.wav", 25, 1.0, 0.7, 1, True, True, 0],
+    examples = [["examples/source/yae_0.wav", "examples/reference/dingzhen_0.wav", 25, 1.0, 0.7, False, True, 0],
+                ["examples/source/jay_0.wav", "examples/reference/azuma_0.wav", 25, 1.0, 0.7, True, True, 0],
                 ["examples/source/Wiz Khalifa,Charlie Puth - See You Again [vocals]_[cut_28sec].wav",
-                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, 3, True, False, 0],
+                 "examples/reference/teio_0.wav", 100, 1.0, 0.7, True, False, 0],
                 ["examples/source/TECHNOPOLIS - 2085 [vocals]_[cut_14sec].wav",
-                 "examples/reference/trump_0.wav", 50, 1.0, 0.7, 3, True, False, -12],
+                 "examples/reference/trump_0.wav", 50, 1.0, 0.7, True, False, -12],
                 ]
 
     outputs = [gr.Audio(label="Stream Output Audio / 流式输出", streaming=True, format='mp3'),
