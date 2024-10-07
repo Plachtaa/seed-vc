@@ -23,7 +23,8 @@ Results in the table below shows that our Seed-VC model significantly outperform
 |----------------|------------|------------|------------|
 | OpenVoice      | 0.7547     | 0.1546     | 0.0473     |
 | CosyVoice      | 0.8440     | 0.1898     | 0.0729     |
-| Seed-VC(Ours)  | **0.8676** | **0.1199** | **0.0292** |
+| Seed-VC(Ours)  | **0.8676** | **0.1199** | **0.0292** |  
+
 *ASR result computed by facebook/hubert-large-ls960-ft model*   
 *Speaker embedding computed by resemblyzer model* <br>  
 
