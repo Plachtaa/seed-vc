@@ -40,7 +40,7 @@ python eval.py --source ./examples/libritts-test-clean \
 --baseline ""  # fill in openvoice or cosyvoice to compute baseline result
 --max-samples 100  # max source utterances to go through
 ```
-Before that, make sure you have openvoice and cosyvoice repo correctly installed on `../OpenVoice/` and `../CosyVoice/` if you would like to run baselien evaluation.
+Before that, make sure you have openvoice and cosyvoice repo correctly installed on `../OpenVoice/` and `../CosyVoice/` if you would like to run baseline evaluation.
 
 ## Installation📥
 Suggested python 3.10 on Windows or Linux.
