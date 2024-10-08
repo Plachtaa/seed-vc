@@ -26,8 +26,8 @@ Results in the table below shows that our Seed-VC model significantly outperform
 | CosyVoice      | 0.8440     | 0.1898     | 0.0729     | 3.51     | **4.02** | 3.21     |
 | Seed-VC(Ours)  | **0.8676** | **0.1199** | **0.0292** | 3.42     | 3.97     | 3.11     |
 
-*ASR result computed by facebook/hubert-large-ls960-ft model*   
-*Speaker embedding computed by resemblyzer model* <br>  
+*ASR result computed by [facebook/hubert-large-ls960-ft](https://huggingface.co/facebook/hubert-large-ls960-ft) model*   
+*Speaker embedding computed by [resemblyzer](https://github.com/resemble-ai/Resemblyzer) model* <br>  
 
 You can reproduce the evaluation by running `eval.py` script.  
 ```bash
@@ -100,8 +100,8 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
 
 ## CHANGELOGS🗒️
 - 2024-09-26:
-    - Added objective evaluation results
-    - Changed speech content encoder to OpenAI Whisper
+    - Updated v0.3 pretrained model, changed speech content encoder to OpenAI Whisper
+    - Added objective evaluation results for v0.3 pretrained model
 - 2024-09-22:
     - Updated singing voice conversion model to use BigVGAN from NVIDIA, providing large improvement to high-pitched singing voices
     - Support chunking and  streaming output for long audio files in Web UI
