@@ -62,7 +62,7 @@ python inference.py --source <源语音文件路径>
 --length-adjust 1.0
 --inference-cfg-rate 0.7
 --f0-condition False # 歌声转换时设置为 True
---auto-f0-condition False # 设置为 True 可自动调整源音高到目标音高，歌声转换中通常不使用
+--auto-f0-adjust False # 设置为 True 可自动调整源音高到目标音高，歌声转换中通常不使用
 --semi-tone-shift 0 # 歌声转换的半音移调
 ```
 其中:
@@ -73,7 +73,7 @@ python inference.py --source <源语音文件路径>
 - `length-adjust` 长度调整系数，默认1.0，<1.0加速语音，>1.0减慢语音
 - `inference-cfg-rate` 对输出有细微影响，默认0.7
 - `f0-condition` 是否根据源音频的音高调整输出音高，默认 False，歌声转换时设置为 True  
-- `auto-f0-condition` 是否自动将源音高调整到目标音高水平，默认 False，歌声转换中通常不使用
+- `auto-f0-adjust` 是否自动将源音高调整到目标音高水平，默认 False，歌声转换中通常不使用
 - `semi-tone-shift` 歌声转换中的半音移调，默认0  
 
 Gradio 网页界面:

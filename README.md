@@ -62,7 +62,7 @@ python inference.py --source <source-wav>
 --length-adjust 1.0
 --inference-cfg-rate 0.7
 --f0-condition False # set to True for singing voice conversion
---auto-f0-condition False # set to True to auto adjust source pitch to target pitch level, normally not used in singing voice conversion
+--auto-f0-adjust False # set to True to auto adjust source pitch to target pitch level, normally not used in singing voice conversion
 --semi-tone-shift 0 # pitch shift in semitones for singing voice conversion
 ```
 where:
@@ -73,7 +73,7 @@ where:
 - `length-adjust` is the length adjustment factor, default is 1.0, set <1.0 for speed-up speech, >1.0 for slow-down speech
 - `inference-cfg-rate` has subtle difference in the output, default is 0.7 
 - `f0-condition` is the flag to condition the pitch of the output to the pitch of the source audio, default is False, set to True for singing voice conversion  
-- `auto-f0-condition` is the flag to auto adjust source pitch to target pitch level, default is False, normally not used in singing voice conversion
+- `auto-f0-adjust` is the flag to auto adjust source pitch to target pitch level, default is False, normally not used in singing voice conversion
 - `semi-tone-shift` is the pitch shift in semitones for singing voice conversion, default is 0  
 
 Gradio web interface:
