@@ -14,3 +14,4 @@ pydub
 resemblyzer
 jiwer
 transformers
+onnxruntime
