@@ -253,8 +253,6 @@ def main(args):
     # Convert to waveform
     # if f0_condition:
     vc_wave = bigvgan_model(vc_target).squeeze(1)  # wav_gen is FloatTensor with shape [B(1), 1, T_time] and values in [-1, 1]
-    # else:
-    #     vc_wave = hift_gen.inference(vc_target, f0=None)
 
     time_vc_end = time.time()
     print(f"RTF: {(time_vc_end - time_vc_start) / vc_wave.size(-1) * sr}")

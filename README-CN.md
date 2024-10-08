@@ -9,6 +9,41 @@
 
 我们将继续改进模型质量并添加更多功能。
 
+## 评估📊
+
+我们对 Seed-VC 的语音转换能力进行了系列客观评估。  
+为了便于复现，源音频是来自 LibriTTS-test-clean 的 100 个随机语句，参考音频是 12 个随机挑选的具有独特特征的自然声音。<br>  
+
+源音频位于 `./examples/libritts-test-clean` <br>
+参考音频位于 `./examples/reference` <br>
+
+我们从说话人嵌入余弦相似度（SECS）、词错误率（WER）和字符错误率（CER）三个方面评估了转换结果，并将我们的结果与两个强大的开源基线模型，即 [OpenVoice](https://github.com/myshell-ai/OpenVoice) 和 [CosyVoice](https://github.com/FunAudioLLM/CosyVoice)，进行了比较。  
+下表的结果显示，我们的 Seed-VC 模型在发音清晰度和说话人相似度上均显著优于基线模型。<br>
+
+| 模型\指标         | SECS↑      | WER↓       | CER↓       | SIG↑     | BAK↑     | OVRL↑    |
+|---------------|------------|------------|------------|----------|----------|----------|
+| Ground Truth  | 1.0000     | 0.0802     | 0.0157     | ~        | ~        | ~        |
+| OpenVoice     | 0.7547     | 0.1546     | 0.0473     | **3.56** | **4.02** | **3.27** |
+| CosyVoice     | 0.8440     | 0.1898     | 0.0729     | 3.51     | **4.02** | 3.21     |
+| Seed-VC（Ours） | **0.8676** | **0.1199** | **0.0292** | 3.42     | 3.97     | 3.11     |
+
+*ASR 结果由 [facebook/hubert-large-ls960-ft](https://huggingface.co/facebook/hubert-large-ls960-ft) 模型计算*  
+*说话人嵌入由 [resemblyzer](https://github.com/resemble-ai/Resemblyzer) 模型计算* <br>
+
+你可以通过运行 `eval.py` 脚本来复现评估。  
+```bash
+python eval.py 
+--source ./examples/libritts-test-clean
+--target ./examples/reference
+--output ./examples/eval/converted
+--diffusion-steps 25
+--length-adjust 1.0
+--inference-cfg-rate 0.7
+--xvector-extractor "resemblyzer"
+--baseline ""  # 填入 openvoice 或 cosyvoice 来计算基线结果
+--max-samples 100  # 要处理的最大源语句数
+```
+在此之前，如果你想运行基线评估，请确保已在 `../OpenVoice/` 和 `../CosyVoice/` 目录下正确安装了 openvoice 和 cosyvoice 仓库。
 ## 安装 📥
 建议在 Windows 或 Linux 上使用 Python 3.10：
 ```bash
@@ -20,15 +55,14 @@ pip install -r requirements.txt
 
 命令行推理：
 ```bash
-python inference.py --source <源语音文件路径> \
---target <参考语音文件路径> \
---output <输出目录> \
---diffusion-steps 25 \ # 建议歌声转换时使用50~100
---length-adjust 1.0 \
---inference-cfg-rate 0.7 \
---n-quantizers 3 \
---f0-condition False \ # 歌声转换时设置为 True
---auto-f0-condition False \ # 设置为 True 可自动调整源音高到目标音高，歌声转换中通常不使用
+python inference.py --source <源语音文件路径>
+--target <参考语音文件路径>
+--output <输出目录>
+--diffusion-steps 25 # 建议歌声转换时使用50~100
+--length-adjust 1.0
+--inference-cfg-rate 0.7
+--f0-condition False # 歌声转换时设置为 True
+--auto-f0-condition False # 设置为 True 可自动调整源音高到目标音高，歌声转换中通常不使用
 --semi-tone-shift 0 # 歌声转换的半音移调
 ```
 其中:
@@ -38,7 +72,6 @@ python inference.py --source <源语音文件路径> \
 - `diffusion-steps` 使用的扩散步数，默认25，最佳质量建议使用50-100，最快推理使用4-10
 - `length-adjust` 长度调整系数，默认1.0，<1.0加速语音，>1.0减慢语音
 - `inference-cfg-rate` 对输出有细微影响，默认0.7
-- `n-quantizers` 用的 FAcodec 码本数量，默认3，使用的码本越少，保留的源音频韵律越少  
 - `f0-condition` 是否根据源音频的音高调整输出音高，默认 False，歌声转换时设置为 True  
 - `auto-f0-condition` 是否自动将源音高调整到目标音高水平，默认 False，歌声转换中通常不使用
 - `semi-tone-shift` 歌声转换中的半音移调，默认0  
@@ -59,13 +92,16 @@ python app.py
     - [x] 这已在 f0 条件模型中启用，但不确定效果如何...
 - [ ] 潜在的架构改进
     - [x] 类似U-ViT 的skip connection
-    - [x] 将输入更改为 [FAcodec](https://github.com/Plachtaa/FAcodec) tokens
+    - [x] 将输入更改为 OpenAI Whisper
 - [ ] 自定义数据训练代码
 - [x] 歌声解码器更改为 NVIDIA 的 BigVGAN
 - [ ] 44k Hz 歌声转换模型
 - [ ] 更多待添加
 
 ## 更新日志 🗒️
+- 2024-09-26:
+    - 添加了客观指标评估结果
+    - 将语音内容编码器更改为 OpenAI Whisper
 - 2024-09-22:
     - 将歌声转换模型的解码器更改为 BigVGAN，解决了大部分高音部分无法正确转换的问题
     - 在Web UI中支持对长输入音频的分段处理以及流式输出

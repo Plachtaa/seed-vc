@@ -10,7 +10,7 @@ We are keeping on improving the model quality and adding more features.
 
 ## Evaluation📊
 We have performed a series of objective evaluations on our Seed-VC's voice conversion capabilities. 
-For ease for reproduction, source audios are 100 random utterances from LibriTTS-test-clean, and reference audios are 12 randomly picked in-the-wild voices with unique characteristics. <br>  
+For ease of reproduction, source audios are 100 random utterances from LibriTTS-test-clean, and reference audios are 12 randomly picked in-the-wild voices with unique characteristics. <br>  
 
 Source audios can be found under `./examples/libritts-test-clean` <br>
 Reference audios can be found under `./examples/reference` <br>
@@ -19,20 +19,22 @@ We evaluate the conversion results in terms of speaker embedding cosine similari
 our results with two strong open sourced baselines, namely [OpenVoice](https://github.com/myshell-ai/OpenVoice) and [CosyVoice](https://github.com/FunAudioLLM/CosyVoice).  
 Results in the table below shows that our Seed-VC model significantly outperforms the baseline models in both intelligibility and speaker similarity.<br>
 
-| Models\Metrics | SECS↑      | WER↓       | CER↓       |
-|----------------|------------|------------|------------|
-| OpenVoice      | 0.7547     | 0.1546     | 0.0473     |
-| CosyVoice      | 0.8440     | 0.1898     | 0.0729     |
-| Seed-VC(Ours)  | **0.8676** | **0.1199** | **0.0292** |  
+| Models\Metrics | SECS↑      | WER↓       | CER↓       | SIG↑     | BAK↑     | OVRL↑    |
+|----------------|------------|------------|------------|----------|----------|----------|
+| Ground Truth   | 1.0000     | 0.0802     | 0.0157     | ~        | ~        | ~        |
+| OpenVoice      | 0.7547     | 0.1546     | 0.0473     | **3.56** | **4.02** | **3.27** |
+| CosyVoice      | 0.8440     | 0.1898     | 0.0729     | 3.51     | **4.02** | 3.21     |
+| Seed-VC(Ours)  | **0.8676** | **0.1199** | **0.0292** | 3.42     | 3.97     | 3.11     |
 
 *ASR result computed by facebook/hubert-large-ls960-ft model*   
 *Speaker embedding computed by resemblyzer model* <br>  
 
 You can reproduce the evaluation by running `eval.py` script.  
 ```bash
-python eval.py --source ./examples/libritts-test-clean \
---reference ./examples/reference
---output ./examples/eval/converted/
+python eval.py 
+--source ./examples/libritts-test-clean
+--target ./examples/reference
+--output ./examples/eval/converted
 --diffusion-steps 25
 --length-adjust 1.0
 --inference-cfg-rate 0.7
@@ -53,7 +55,7 @@ Checkpoints of the latest model release will be downloaded automatically when fi
 
 Command line inference:
 ```bash
-python inference.py --source <source-wav> \
+python inference.py --source <source-wav>
 --target <referene-wav>
 --output <output-dir>
 --diffusion-steps 25 # recommended 50~100 for singingvoice conversion

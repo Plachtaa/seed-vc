@@ -31,6 +31,29 @@ from transformers import Wav2Vec2Processor, HubertForCTC
 import jiwer
 import string
 
+from baselines.dnsmos.dnsmos_computor import DNSMOSComputer
+
+def calc_mos(computor, audio, orin_sr):
+    # only 16k audio is supported
+    target_sr = 16000
+    if orin_sr != 16000:
+        audio = librosa.resample(
+            audio, orig_sr=orin_sr, target_sr=target_sr, res_type="kaiser_fast"
+        )
+    result = computor.compute(audio, target_sr, False)
+    sig, bak, ovr = result["SIG"], result["BAK"], result["OVRL"]
+
+    if ovr == 0:
+        print("calculate dns mos failed")
+    return sig, bak, ovr
+
+mos_computer = DNSMOSComputer(
+    "baselines/dnsmos/sig_bak_ovr.onnx",
+    "baselines/dnsmos/model_v8.onnx",
+    device="cuda",
+    device_id=0,
+)
+
 def load_models(args):
     dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                      "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
@@ -175,6 +198,7 @@ def main(args):
     gt_cer_list = []
     vc_wer_list = []
     vc_cer_list = []
+    dnsmos_list = []
     for source_i, source_line in enumerate(tqdm(source_audio_list)):
         if source_i >= max_samples:
             break
@@ -287,11 +311,19 @@ def main(args):
             vc_wer_list.append(vc_wer)
             vc_cer_list.append(vc_cer)
 
+            # calculate dnsmos
+            sig, bak, ovr = calc_mos(mos_computer, vc_wave_16k.squeeze(0).cpu().numpy(), 16000)
+            dnsmos_list.append((sig, bak, ovr))
+
         print(f"Average GT WER: {sum(gt_wer_list) / len(gt_wer_list)}")
         print(f"Average GT CER: {sum(gt_cer_list) / len(gt_cer_list)}")
         print(f"Average VC WER: {sum(vc_wer_list) / len(vc_wer_list)}")
         print(f"Average VC CER: {sum(vc_cer_list) / len(vc_cer_list)}")
         print(f"Average similarity: {sum(similarity_list) / len(similarity_list)}")
+
+        print(f"Average DNS MOS SIG: {sum([x[0] for x in dnsmos_list]) / len(dnsmos_list)}")
+        print(f"Average DNS MOS BAK: {sum([x[1] for x in dnsmos_list]) / len(dnsmos_list)}")
+        print(f"Average DNS MOS OVR: {sum([x[2] for x in dnsmos_list]) / len(dnsmos_list)}")
 
         # save wer and cer result into this directory as a txt
         with open(osp.join(conversion_result_dir, source_index, "result.txt"), 'w') as f:
@@ -315,6 +347,10 @@ def main(args):
         f.write(f"GT CER: {sum(gt_cer_list) / len(gt_cer_list)}\n")
         f.write(f"VC WER: {sum(vc_wer_list) / len(vc_wer_list)}\n")
         f.write(f"VC CER: {sum(vc_cer_list) / len(vc_cer_list)}\n")
+
+    print(f"Average DNS MOS SIG: {sum([x[0] for x in dnsmos_list]) / len(dnsmos_list)}")
+    print(f"Average DNS MOS BAK: {sum([x[1] for x in dnsmos_list]) / len(dnsmos_list)}")
+    print(f"Average DNS MOS OVR: {sum([x[2] for x in dnsmos_list]) / len(dnsmos_list)}")
 
 
 def convert(
