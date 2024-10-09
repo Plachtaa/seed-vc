@@ -122,15 +122,20 @@ def adjust_f0_semitones(f0_sequence, n_semitones):
     factor = 2 ** (n_semitones / 12)
     return f0_sequence * factor
 
+# def crossfade(chunk1, chunk2, overlap):
+#     fade_out = np.linspace(1, 0, overlap)
+#     fade_in = np.linspace(0, 1, overlap)
+#     chunk2[:overlap] = chunk2[:overlap] * fade_in + chunk1[-overlap:] * fade_out
+#     return chunk2
 def crossfade(chunk1, chunk2, overlap):
-    fade_out = np.linspace(1, 0, overlap)
-    fade_in = np.linspace(0, 1, overlap)
+    fade_out = np.cos(np.linspace(0, np.pi / 2, overlap)) ** 2
+    fade_in = np.cos(np.linspace(np.pi / 2, 0, overlap)) ** 2
     chunk2[:overlap] = chunk2[:overlap] * fade_in + chunk1[-overlap:] * fade_out
     return chunk2
 
 # streaming and chunk processing related params
 max_context_window = sr // hop_length * 30
-overlap_frame_len = 64
+overlap_frame_len = 16
 overlap_wave_len = overlap_frame_len * hop_length
 bitrate = "320k"
 

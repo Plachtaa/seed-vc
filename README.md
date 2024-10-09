@@ -19,12 +19,27 @@ We evaluate the conversion results in terms of speaker embedding cosine similari
 our results with two strong open sourced baselines, namely [OpenVoice](https://github.com/myshell-ai/OpenVoice) and [CosyVoice](https://github.com/FunAudioLLM/CosyVoice).  
 Results in the table below shows that our Seed-VC model significantly outperforms the baseline models in both intelligibility and speaker similarity.<br>
 
-| Models\Metrics | SECS↑      | WER↓       | CER↓       | SIG↑     | BAK↑     | OVRL↑    |
-|----------------|------------|------------|------------|----------|----------|----------|
-| Ground Truth   | 1.0000     | 0.0802     | 0.0157     | ~        | ~        | ~        |
-| OpenVoice      | 0.7547     | 0.1546     | 0.0473     | **3.56** | **4.02** | **3.27** |
-| CosyVoice      | 0.8440     | 0.1898     | 0.0729     | 3.51     | **4.02** | 3.21     |
-| Seed-VC(Ours)  | **0.8676** | **0.1199** | **0.0292** | 3.42     | 3.97     | 3.11     |
+| Models\Metrics | SECS↑      | WER↓      | CER↓     | SIG↑     | BAK↑     | OVRL↑    |
+|----------------|------------|-----------|----------|----------|----------|----------|
+| Ground Truth   | 1.0000     | 8.02      | 1.57     | ~        | ~        | ~        |
+| OpenVoice      | 0.7547     | 15.46     | 4.73     | **3.56** | **4.02** | **3.27** |
+| CosyVoice      | 0.8440     | 18.98     | 7.29     | 3.51     | **4.02** | 3.21     |
+| Seed-VC(Ours)  | **0.8676** | **11.99** | **2.92** | 3.42     | 3.97     | 3.11     |
+
+We have also compared with non-zero-shot voice conversion models for several speakers (based on model availability):
+
+| Characters  | Models\Metrics | SECS↑      | WER↓      | CER↓     | SIG↑     | BAK↑     | OVRL↑    |
+|-------------|----------------|------------|-----------|----------|----------|----------|----------|
+| ~           | Ground Truth   | 1.0000     | 6.43      | 1.00     | ~        | ~        | ~        |
+| Tokai Teio  | So-VITS-4.0    | 0.8637     | 21.46     | 9.63     | 3.06     | 3.66     | 2.68     |
+|             | Seed-VC(Ours)  | **0.8899** | **15.32** | **4.66** | **3.12** | **3.71** | **2.72** |
+| Milky Green | So-VITS-4.0    | 0.6850     | 48.43     | 32.50    | 3.34     | 3.51     | 2.82     |
+|             | Seed-VC(Ours)  | **0.8072** | **7.26**  | **1.32** | **3.48** | **4.07** | **3.20** |
+
+Results show that, despite not being trained on the target speakers, Seed-VC is able to achieve significantly better results than the non-zero-shot models. 
+However, this may vary a low depending on the SoVITS model quality. PR or Issue is welcomed if you find this comparison unfair or inaccurate.  
+(Tokai Teio model from [zomehwh/sovits-tannhauser](https://huggingface.co/spaces/zomehwh/sovits-tannhauser))  
+(Milky Green model from [sparanoid/milky-green-sovits-4](https://huggingface.co/spaces/sparanoid/milky-green-sovits-4))  
 
 *ASR result computed by [facebook/hubert-large-ls960-ft](https://huggingface.co/facebook/hubert-large-ls960-ft) model*   
 *Speaker embedding computed by [resemblyzer](https://github.com/resemble-ai/Resemblyzer) model* <br>  

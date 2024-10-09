@@ -185,7 +185,11 @@ def main(args):
     inference_cfg_rate = args.inference_cfg_rate
     baseline = args.baseline
     max_samples = args.max_samples
-    source_audio_list = open(osp.join(source_dir, "index.tsv"), "r").readlines()
+    try:
+        source_audio_list = open(osp.join(source_dir, "index.tsv"), "r").readlines()
+    except FileNotFoundError:
+        source_audio_list = os.listdir(source_dir)
+        source_audio_list = [f for f in source_audio_list if f.endswith(".wav")]
     target_audio_list = os.listdir(target_dir)
 
     conversion_result_dir = args.output

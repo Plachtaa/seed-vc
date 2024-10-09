@@ -79,16 +79,36 @@ class BASECFM(torch.nn.Module, ABC):
         if self.zero_prompt_speech_token:
             mu[..., :prompt_len] = 0
         for step in tqdm(range(1, len(t_span))):
-            dphi_dt = self.estimator(x, prompt_x, x_lens, t.unsqueeze(0), style, mu, f0)
-            # Classifier-Free Guidance inference introduced in VoiceBox
+            # dphi_dt = self.estimator(x, prompt_x, x_lens, t.unsqueeze(0), style, mu, f0)
+            # # Classifier-Free Guidance inference introduced in VoiceBox
+            # if inference_cfg_rate > 0:
+            #     cfg_dphi_dt = self.estimator(
+            #         x, torch.zeros_like(prompt_x), x_lens, t.unsqueeze(0),
+            #         torch.zeros_like(style),
+            #         torch.zeros_like(mu), None
+            #     )
+            #     dphi_dt = ((1.0 + inference_cfg_rate) * dphi_dt -
+            #                inference_cfg_rate * cfg_dphi_dt)
             if inference_cfg_rate > 0:
-                cfg_dphi_dt = self.estimator(
-                    x, torch.zeros_like(prompt_x), x_lens, t.unsqueeze(0),
-                    torch.zeros_like(style),
-                    torch.zeros_like(mu), None
+                # Stack original and CFG (null) inputs for batched processing
+                stacked_prompt_x = torch.cat([prompt_x, torch.zeros_like(prompt_x)], dim=0)
+                stacked_style = torch.cat([style, torch.zeros_like(style)], dim=0)
+                stacked_mu = torch.cat([mu, torch.zeros_like(mu)], dim=0)
+                stacked_x = torch.cat([x, x], dim=0)
+
+                # Perform a single forward pass for both original and CFG inputs
+                stacked_dphi_dt = self.estimator(
+                    stacked_x, stacked_prompt_x, x_lens, t.unsqueeze(0), stacked_style, stacked_mu, None
                 )
-                dphi_dt = ((1.0 + inference_cfg_rate) * dphi_dt -
-                           inference_cfg_rate * cfg_dphi_dt)
+
+                # Split the output back into the original and CFG components
+                dphi_dt, cfg_dphi_dt = stacked_dphi_dt.chunk(2, dim=0)
+
+                # Apply CFG formula
+                dphi_dt = (1.0 + inference_cfg_rate) * dphi_dt - inference_cfg_rate * cfg_dphi_dt
+            else:
+                dphi_dt = self.estimator(x, prompt_x, x_lens, t.unsqueeze(0), style, mu, f0)
+
             x = x + dt * dphi_dt
             t = t + dt
             sol.append(x)
