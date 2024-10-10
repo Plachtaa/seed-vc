@@ -28,17 +28,20 @@ Results in the table below shows that our Seed-VC model significantly outperform
 
 We have also compared with non-zero-shot voice conversion models for several speakers (based on model availability):
 
-| Characters  | Models\Metrics | SECS↑      | WER↓      | CER↓     | SIG↑     | BAK↑     | OVRL↑    |
-|-------------|----------------|------------|-----------|----------|----------|----------|----------|
-| ~           | Ground Truth   | 1.0000     | 6.43      | 1.00     | ~        | ~        | ~        |
-| Tokai Teio  | So-VITS-4.0    | 0.8637     | 21.46     | 9.63     | 3.06     | 3.66     | 2.68     |
-|             | Seed-VC(Ours)  | **0.8899** | **15.32** | **4.66** | **3.12** | **3.71** | **2.72** |
-| Milky Green | So-VITS-4.0    | 0.6850     | 48.43     | 32.50    | 3.34     | 3.51     | 2.82     |
-|             | Seed-VC(Ours)  | **0.8072** | **7.26**  | **1.32** | **3.48** | **4.07** | **3.20** |
+| Characters          | Models\Metrics | SECS↑      | WER↓      | CER↓     | SIG↑     | BAK↑     | OVRL↑    |
+|---------------------|----------------|------------|-----------|----------|----------|----------|----------|
+| ~                   | Ground Truth   | 1.0000     | 6.43      | 1.00     | ~        | ~        | ~        |
+| Tokai Teio          | So-VITS-4.0    | 0.8637     | 21.46     | 9.63     | 3.06     | 3.66     | 2.68     |
+|                     | Seed-VC(Ours)  | **0.8899** | **15.32** | **4.66** | **3.12** | **3.71** | **2.72** |
+| Milky Green         | So-VITS-4.0    | 0.6850     | 48.43     | 32.50    | 3.34     | 3.51     | 2.82     |
+|                     | Seed-VC(Ours)  | **0.8072** | **7.26**  | **1.32** | **3.48** | **4.07** | **3.20** |
+| Matikane Tannhuaser | So-VITS-4.0    | 0.8594     | 16.25     | 8.64     | **3.25** | 3.71     | 2.84     |
+|                     | Seed-VC(Ours)  | **0.8768** | **12.62** | **5.86** | 3.18     | **3.83** | **2.85** |
 
 Results show that, despite not being trained on the target speakers, Seed-VC is able to achieve significantly better results than the non-zero-shot models. 
-However, this may vary a low depending on the SoVITS model quality. PR or Issue is welcomed if you find this comparison unfair or inaccurate.  
-(Tokai Teio model from [zomehwh/sovits-tannhauser](https://huggingface.co/spaces/zomehwh/sovits-tannhauser))  
+However, this may vary a lot depending on the SoVITS model quality. PR or Issue is welcomed if you find this comparison unfair or inaccurate.  
+(Tokai Teio model from [zomehwh/sovits-tannhauser](https://huggingface.co/spaces/zomehwh/sovits-tannhauser))   
+(Matikane Tannhuaser model from [zomehwh/sovits-tannhauser](https://huggingface.co/spaces/zomehwh/sovits-tannhauser))  
 (Milky Green model from [sparanoid/milky-green-sovits-4](https://huggingface.co/spaces/sparanoid/milky-green-sovits-4))  
 
 *ASR result computed by [facebook/hubert-large-ls960-ft](https://huggingface.co/facebook/hubert-large-ls960-ft) model*   

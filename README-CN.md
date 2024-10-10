@@ -27,6 +27,24 @@
 | CosyVoice     | 0.8440     | 0.1898     | 0.0729     | 3.51     | **4.02** | 3.21     |
 | Seed-VC（Ours） | **0.8676** | **0.1199** | **0.0292** | 3.42     | 3.97     | 3.11     |
 
+我们也与非zero-shot的声线转换模型在特定角色上进行了比较（基于可以找到的公开模型）:
+
+| Characters | Models\Metrics | SECS↑      | WER↓      | CER↓     | SIG↑     | BAK↑     | OVRL↑    |
+|------------|----------------|------------|-----------|----------|----------|----------|----------|
+| ~          | Ground Truth   | 1.0000     | 6.43      | 1.00     | ~        | ~        | ~        |
+| 东海帝王       | So-VITS-4.0    | 0.8637     | 21.46     | 9.63     | 3.06     | 3.66     | 2.68     |
+|            | Seed-VC(Ours)  | **0.8899** | **15.32** | **4.66** | **3.12** | **3.71** | **2.72** |
+| 明前奶绿       | So-VITS-4.0    | 0.6850     | 48.43     | 32.50    | 3.34     | 3.51     | 2.82     |
+|            | Seed-VC(Ours)  | **0.8072** | **7.26**  | **1.32** | **3.48** | **4.07** | **3.20** |
+| 待兼诗歌剧      | So-VITS-4.0    | 0.8594     | 16.25     | 8.64     | **3.25** | 3.71     | 2.84     |
+|            | Seed-VC(Ours)  | **0.8768** | **12.62** | **5.86** | 3.18     | **3.83** | **2.85** |
+
+结果显示，即便我们的模型没有在特定说话人上进行微调或训练，在音色相似度和咬字清晰度上也全面优于在特定说话人数据集上专门训练的SoVITS模型。 
+但是该项测试结果高度依赖于SoVITS模型质量。如果您认为此对比不公平或不够准确，欢迎提issue或PR。  
+(东海帝王模型来自 [zomehwh/sovits-tannhauser](https://huggingface.co/spaces/zomehwh/sovits-tannhauser))   
+(待兼诗歌剧模型来自 [zomehwh/sovits-tannhauser](https://huggingface.co/spaces/zomehwh/sovits-tannhauser))  
+(明前奶绿模型来自 [sparanoid/milky-green-sovits-4](https://huggingface.co/spaces/sparanoid/milky-green-sovits-4))  
+
 *ASR 结果由 [facebook/hubert-large-ls960-ft](https://huggingface.co/facebook/hubert-large-ls960-ft) 模型计算*  
 *说话人嵌入由 [resemblyzer](https://github.com/resemble-ai/Resemblyzer) 模型计算* <br>
 
