@@ -274,8 +274,8 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     if f0_condition:
         waves_16k = torchaudio.functional.resample(waves_24k, 24000, 16000)
         converted_waves_16k = torchaudio.functional.resample(converted_waves_24k, 24000, 16000)
-        F0_ori = rmvpe.infer_from_audio(waves_16k[0], thred=0.03)
-        F0_alt = rmvpe.infer_from_audio(converted_waves_16k[0], thred=0.03)
+        F0_ori = rmvpe.infer_from_audio(waves_16k[0], thred=0.5)
+        F0_alt = rmvpe.infer_from_audio(converted_waves_16k[0], thred=0.5)
 
         F0_ori = torch.from_numpy(F0_ori).to(device)[None]
         F0_alt = torch.from_numpy(F0_alt).to(device)[None]
