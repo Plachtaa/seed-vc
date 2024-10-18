@@ -104,7 +104,7 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
 - [x] Release v0.1 pretrained model: [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-SeedVC-blue)](https://huggingface.co/Plachta/Seed-VC)
 - [x] Huggingface space demo: [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)
 - [x] HTML demo page (maybe with comparisons to other VC models): [Demo](https://plachtaa.github.io/seed-vc/)
-- [ ] Streaming inference
+- [ ] Streaming inference (current implementation needs 1~2s latency to prevent quality drop, which is too high to accept...😥)
 - [x] Singing voice conversion
 - [ ] Noise resiliency for source & reference audio
     - [x] Source audio is noise resilience
