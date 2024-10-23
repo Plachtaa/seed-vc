@@ -117,7 +117,7 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
-- 2024-09-26:
+- 2024-10-07:
     - Updated v0.3 pretrained model, changed speech content encoder to OpenAI Whisper
     - Added objective evaluation results for v0.3 pretrained model
 - 2024-09-22:
