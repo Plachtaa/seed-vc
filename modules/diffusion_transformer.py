@@ -3,6 +3,7 @@ from torch import nn
 import math
 
 from modules.gpt_fast.model import ModelArgs, Transformer
+# from modules.torchscript_modules.gpt_fast_model import ModelArgs, Transformer
 from modules.wavenet import WN
 from modules.commons import sequence_mask
 
