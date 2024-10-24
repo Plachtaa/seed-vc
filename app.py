@@ -14,8 +14,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                 "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
                                                 "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
-# dit_checkpoint_path = "E:/DiT_epoch_00018_step_801000.pth"
-# dit_config_path = "configs/config_dit_mel_seed_uvit_whisper_small_encoder_wavenet.yml"
 config = yaml.safe_load(open(dit_config_path, 'r'))
 model_params = recursive_munch(config['model_params'])
 model = build_model(model_params, stage='DiT')
@@ -97,7 +95,7 @@ sr = config['preprocess_params']['sr']
 
 # Load checkpoints
 model_f0, _, _, _ = load_checkpoint(model_f0, None, dit_checkpoint_path,
-                                 load_only_params=True, ignore_modules=[], is_distributed=False, load_ema=True)
+                                 load_only_params=True, ignore_modules=[], is_distributed=False)
 for key in model_f0:
     model_f0[key].eval()
     model_f0[key].to(device)
