@@ -1,7 +1,7 @@
 # Seed-VC
 [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  
 
-*[English](README.md) | 简体中文*    
+*[English](README.md) | 简体中文 | [日本語](README-JP.md)*    
 
 目前发布的模型支持零样本语音转换和零样本歌声转换。无需任何训练，只需提供1~30秒的参考语音即可克隆声音。  
 
