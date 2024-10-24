@@ -49,6 +49,7 @@ class BASECFM(torch.nn.Module, ABC):
         B, T = mu.size(0), mu.size(1)
         z = torch.randn([B, self.in_channels, T], device=mu.device) * temperature
         t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device)
+        # t_span = t_span + (-1) * (torch.cos(torch.pi / 2 * t_span) - 1 + t_span)
         return self.solve_euler(z, x_lens, prompt, mu, style, f0, t_span, inference_cfg_rate)
 
     def solve_euler(self, x, x_lens, prompt, mu, style, f0, t_span, inference_cfg_rate=0.5):
@@ -66,7 +67,7 @@ class BASECFM(torch.nn.Module, ABC):
                 shape: (batch_size, spk_emb_dim)
             cond: Not used but kept for future purposes
         """
-        t, _, dt = t_span[0], t_span[-1], t_span[1] - t_span[0]
+        t, _, _ = t_span[0], t_span[-1], t_span[1] - t_span[0]
 
         # I am storing this because I can later plot it by putting a debugger here and saving it to a file
         # Or in future might add like a return_all_steps flag
@@ -79,16 +80,7 @@ class BASECFM(torch.nn.Module, ABC):
         if self.zero_prompt_speech_token:
             mu[..., :prompt_len] = 0
         for step in tqdm(range(1, len(t_span))):
-            # dphi_dt = self.estimator(x, prompt_x, x_lens, t.unsqueeze(0), style, mu, f0)
-            # # Classifier-Free Guidance inference introduced in VoiceBox
-            # if inference_cfg_rate > 0:
-            #     cfg_dphi_dt = self.estimator(
-            #         x, torch.zeros_like(prompt_x), x_lens, t.unsqueeze(0),
-            #         torch.zeros_like(style),
-            #         torch.zeros_like(mu), None
-            #     )
-            #     dphi_dt = ((1.0 + inference_cfg_rate) * dphi_dt -
-            #                inference_cfg_rate * cfg_dphi_dt)
+            dt = t_span[step] - t_span[step - 1]
             if inference_cfg_rate > 0:
                 # Stack original and CFG (null) inputs for batched processing
                 stacked_prompt_x = torch.cat([prompt_x, torch.zeros_like(prompt_x)], dim=0)

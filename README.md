@@ -113,10 +113,13 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
     - [x] Changed input to OpenAI Whisper
 - [ ] Code for training on custom data
 - [x] Changed to BigVGAN from NVIDIA for singing voice decoding
-- [ ] Whisper version model for singing voice conversion
+- [x] Whisper version model for singing voice conversion
+- [ ] Objective evaluation and comparison with RVC/SoVITS for singing voice conversion
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
+- 2024-10-24:
+    - Updated 44kHz singing voice conversion model, with OpenAI Whisper as speech content input
 - 2024-10-07:
     - Updated v0.3 pretrained model, changed speech content encoder to OpenAI Whisper
     - Added objective evaluation results for v0.3 pretrained model

@@ -441,9 +441,20 @@ def load_checkpoint(
     load_only_params=True,
     ignore_modules=[],
     is_distributed=False,
+    load_ema=False,
 ):
     state = torch.load(path, map_location="cpu")
     params = state["net"]
+    if load_ema and "ema" in state:
+        print("Loading EMA")
+        for key in model:
+            i = 0
+            for param_name in params[key]:
+                if "input_pos" in param_name:
+                    continue
+                assert params[key][param_name].shape == state["ema"][key][0][i].shape
+                params[key][param_name] = state["ema"][key][0][i].clone()
+                i += 1
     for key in model:
         if key in params and key not in ignore_modules:
             if not is_distributed:

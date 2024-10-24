@@ -126,9 +126,9 @@ class InterpolateRegulator(nn.Module):
             if f0 is None:
                 x = x + self.f0_mask.unsqueeze(-1)
             else:
-                quantized_f0 = torch.bucketize(f0, self.f0_bins.to(f0.device))  # (N, T)
-                #quantized_f0 = f0_to_coarse(f0, self.n_f0_bins)
-                #quantized_f0 = quantized_f0.clamp(0, self.n_f0_bins - 1).long()
+                #quantized_f0 = torch.bucketize(f0, self.f0_bins.to(f0.device))  # (N, T)
+                quantized_f0 = f0_to_coarse(f0, self.n_f0_bins)
+                quantized_f0 = quantized_f0.clamp(0, self.n_f0_bins - 1).long()
                 f0_emb = self.f0_embedding(quantized_f0)
                 f0_emb = F.interpolate(f0_emb.transpose(1, 2).contiguous(), size=ylens.max(), mode='nearest')
                 x = x + f0_emb

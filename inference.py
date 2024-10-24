@@ -29,11 +29,10 @@ def load_models(args):
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
                                                                          "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
-        f0_extractor = None
     else:
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                                         "DiT_seed_v2_uvit_facodec_small_wavenet_f0_bigvgan_pruned.pth",
-                                                                         "config_dit_mel_seed_facodec_small_wavenet_f0.yml")
+                                                                        "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ema.pth",
+                                                                        "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")
         # f0 extractor
         from modules.rmvpe import RMVPE
 
@@ -64,7 +63,8 @@ def load_models(args):
     campplus_model.to(device)
 
     from modules.bigvgan import bigvgan
-    bigvgan_model = bigvgan.BigVGAN.from_pretrained('nvidia/bigvgan_v2_22khz_80band_256x', use_cuda_kernel=False)
+    bigvgan_name = 'nvidia/bigvgan_v2_22khz_80band_256x' if sr == 22050 else 'nvidia/bigvgan_v2_44khz_128band_512x'
+    bigvgan_model = bigvgan.BigVGAN.from_pretrained(bigvgan_name, use_cuda_kernel=False)
 
     # remove weight norm in the model and set to eval mode
     bigvgan_model.remove_weight_norm()
@@ -179,7 +179,7 @@ def main(args):
         ori_waves_16k = torchaudio.functional.resample(ref_audio, sr, 16000)
         ori_inputs = whisper_feature_extractor([ori_waves_16k.squeeze(0).cpu().numpy()],
                                                return_tensors="pt",
-                                               return_attention_mask=True)
+                                               return_attention_mask=True,)
         ori_input_features = whisper_model._mask_input_features(
             ori_inputs.input_features, attention_mask=ori_inputs.attention_mask).to(device)
         with torch.no_grad():
@@ -209,10 +209,8 @@ def main(args):
     style2 = campplus_model(feat2.unsqueeze(0))
 
     if f0_condition:
-        waves_16k = torchaudio.functional.resample(waves_24k, sr, 16000)
-        converted_waves_16k = torchaudio.functional.resample(converted_waves_24k, sr, 16000)
-        F0_ori = f0_extractor.infer_from_audio(waves_16k[0], thred=0.03)
-        F0_alt = f0_extractor.infer_from_audio(converted_waves_16k[0], thred=0.03)
+        F0_ori = f0_extractor.infer_from_audio(ref_waves_16k[0], thred=0.03)
+        F0_alt = f0_extractor.infer_from_audio(source_waves_16k[0], thred=0.03)
 
         F0_ori = torch.from_numpy(F0_ori).to(device)[None]
         F0_alt = torch.from_numpy(F0_alt).to(device)[None]
@@ -250,8 +248,8 @@ def main(args):
             inference_cfg_rate=inference_cfg_rate)
     vc_target = vc_target[:, :, mel2.size(-1):]
 
+
     # Convert to waveform
-    # if f0_condition:
     vc_wave = bigvgan_model(vc_target).squeeze(1)  # wav_gen is FloatTensor with shape [B(1), 1, T_time] and values in [-1, 1]
 
     time_vc_end = time.time()
@@ -271,8 +269,8 @@ if __name__ == "__main__":
     parser.add_argument("--diffusion-steps", type=int, default=30)
     parser.add_argument("--length-adjust", type=float, default=1.0)
     parser.add_argument("--inference-cfg-rate", type=float, default=0.7)
-    parser.add_argument("--f0-condition", type=bool, default=False)
-    parser.add_argument("--auto-f0-adjust", type=bool, default=False)
+    parser.add_argument("--f0-condition", type=bool, default=True)
+    parser.add_argument("--auto-f0-adjust", type=bool, default=True)
     parser.add_argument("--semi-tone-shift", type=int, default=0)
     args = parser.parse_args()
     main(args)

@@ -165,7 +165,6 @@ class DiT(torch.nn.Module):
                     nn.SiLU(),
                     nn.Linear(args.DiT.hidden_dim, args.DiT.in_channels),
             )
-            self.final_conv = nn.Conv1d(args.DiT.in_channels, args.DiT.in_channels, kernel_size=3, padding=1)
         self.transformer_style_condition = args.DiT.style_condition
         self.wavenet_style_condition = args.wavenet.style_condition
         assert args.DiT.style_condition == args.wavenet.style_condition
@@ -238,5 +237,4 @@ class DiT(torch.nn.Module):
         else:
             x = self.final_mlp(x_res)
             x = x.transpose(1, 2)
-            x = self.final_conv(x)
         return x
