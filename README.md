@@ -29,7 +29,7 @@ Results in the table below shows that our Seed-VC model significantly outperform
 We have also compared with non-zero-shot voice conversion models for several speakers (based on model availability):
 
 | Characters          | Models\Metrics | SECS↑      | WER↓      | CER↓     | SIG↑     | BAK↑     | OVRL↑    |
-|---------------------|----------------|------------|-----------|----------|----------|----------|
+|---------------------|----------------|------------|-----------|----------|----------|----------|----------|
 | ~                   | Ground Truth   | 1.0000     | 6.43      | 1.00     | ~        | ~        | ~        |
 | Tokai Teio          | So-VITS-4.0    | 0.8637     | 21.46     | 9.63     | 3.06     | 3.66     | 2.68     |
 |                     | Seed-VC(Ours)  | **0.8899** | **15.32** | **4.66** | **3.12** | **3.71** | **2.72** |
