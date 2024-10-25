@@ -183,7 +183,7 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
 - [x] Changed to BigVGAN from NVIDIA for singing voice decoding
 - [x] Whisper version model for singing voice conversion
 - [x] Objective evaluation and comparison with RVC/SoVITS for singing voice conversion
-- [ ] Improved audio quality
+- [ ] Improve audio quality
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
