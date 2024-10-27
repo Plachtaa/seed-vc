@@ -268,7 +268,6 @@ if __name__ == "__main__":
     import time
     import traceback
     from multiprocessing import Queue, cpu_count
-    from queue import Empty
 
     import librosa
     import numpy as np

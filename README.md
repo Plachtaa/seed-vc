@@ -2,7 +2,7 @@
 [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  
 
 *English | [简体中文](README-CN.md) | [日本語](README-JP.md)*  
-Currently released model supports *zero-shot voice conversion* 🔊 , *zero-shot real-time voice conversion* 🙎‍♂️🎙 and *zero-shot singing voice conversion* 🎙🎶. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
+Currently released model supports *zero-shot voice conversion* 🔊 , *zero-shot real-time voice conversion* 🗣️ and *zero-shot singing voice conversion* 🎶. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
 
 To find a list of demos and comparisons with previous voice conversion models, please visit our [demo page](https://plachtaa.github.io/seed-vc/)🌐  
 
