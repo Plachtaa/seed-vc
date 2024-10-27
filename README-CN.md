@@ -3,7 +3,7 @@
 
 *[English](README.md) | 简体中文 | [日本語](README-JP.md)*    
 
-目前发布的模型支持零样本语音转换🔊，零样本实时语音转换🙎‍♂️🎙和零样本歌声转换🎙🎶。无需任何训练，只需提供1~30秒的参考语音即可克隆声音。  
+目前发布的模型支持零样本语音转换🔊，零样本实时语音转换🙎🗣️和零样本歌声转换🎶。无需任何训练，只需提供1~30秒的参考语音即可克隆声音。  
 
 要查看演示列表和与之前语音转换模型的比较，请访问我们的 [演示页面](https://plachtaa.github.io/seed-vc/)🌐  
 
@@ -162,13 +162,36 @@ Gradio 网页界面:
 ```bash
 python app.py
 ```
+
+实时变声界面:
+```bash
+python real-time-gui.py
+```
+强烈建议使用GPU进行实时声音转换任务。  
+以下为部分在 NVIDIA RTX 3060 Laptop GPU 上的实验结果, 以及几组推荐的参数设置:
+
+| Remarks                                 | Diffusion Steps | Inference CFG Rate | Max Prompt Length | Block Time (s) | Crossfade Length (s) | Extra context (left) (s) | Extra context (right) (s) | Latency (ms) | Quality | Inference Time per Chunk (ms) |
+|-----------------------------------------|-----------------|--------------------|-------------------|----------------|----------------------|--------------------------|---------------------------|--------------|---------|-------------------------------| 
+| 适合大多数声音                                 | 10              | 0.7                | 3.0               | 1.0s           | 0.04s                | 0.5s                     | 0.02s                     | 2070ms       | Medium  | 849ms                         |
+| 音质会更好                                   | 20              | 0.7                | 3.0               | 2.0s           | 0.04s                | 0.5s                     | 0.02s                     | 4070ms       | High    | 1585ms                        |
+| 音质差一些，但是对部分男性声音听不出差距                    | 5               | 0.7                | 3.0               | 0.6s           | 0.04s                | 0.5s                     | 0.02s                     | 1270ms       | Low     | 488ms                         |
+| 将inference_cfg_rate调为0.0可提速，但不确定性能是否有下降 | 10              | 0.0                | 3.0               | 0.7s           | 0.04s                | 0.5s                     | 0.02s                     | 1470ms       | Medium  | 555ms                         |
+
+你可以根据自己的硬件情况自由调整参数，只要Inference Time 大于 Block Time，声音转换即可正常运行.  
+在PC运行其它GPU任务时，推理速度会有所下降 (例如：运行游戏或播放影片)  
+总体来说，受制于推理时间，目前需要1~2秒延迟来避免质量下降（扩散模型推理慢的通病），我们会努力寻找更好的解决方案。  
+
+*(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*
+
 然后在浏览器中打开 `http://localhost:7860/` 使用网页界面。
 ## TODO📝
 - [x] 发布代码
 - [x] 发布 v0.1 预训练模型： [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-SeedVC-blue)](https://huggingface.co/Plachta/Seed-VC)
 - [x] Hugging Face Space 演示： [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)
 - [x] HTML 演示页面（可能包含与其他 VC 模型的比较）： [Demo](https://plachtaa.github.io/seed-vc/)
-- [ ] 流式推理
+- [x] 流式推理
+- [ ] 降低延迟
+- [ ] 实时变声Demo视频
 - [x] 歌声转换
 - [x] 提高源音频抗噪性
 - [ ] 潜在的架构改进
@@ -182,6 +205,8 @@ python app.py
 - [ ] 更多待添加
 
 ## 更新日志 🗒️
+- 2024-10-27:
+    - 更新了实时变声脚本
 - 2024-10-25:
     - 添加了详尽的歌声转换评估结果以及与RVCv2模型的比较
 - 2024-10-24:
