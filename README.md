@@ -2,7 +2,7 @@
 [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  
 
 *English | [简体中文](README-CN.md) | [日本語](README-JP.md)*  
-Currently released model supports *zero-shot voice conversion* 🔊 and *zero-shot singing voice conversion* 🎙. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
+Currently released model supports *zero-shot voice conversion* 🔊 , *zero-shot real-time voice conversion* 🙎‍♂️🎙 and *zero-shot singing voice conversion* 🎙🎶. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
 
 To find a list of demos and comparisons with previous voice conversion models, please visit our [demo page](https://plachtaa.github.io/seed-vc/)🌐  
 
@@ -167,12 +167,34 @@ Gradio web interface:
 python app.py
 ```
 Then open the browser and go to `http://localhost:7860/` to use the web interface.
+
+Real-time voice conversion GUI:
+```bash
+python real-time-gui.py
+```
+IMPORTANT: It is strongly recommended to use a GPU for real-time voice conversion.  
+Some performance testing has been done on a NVIDIA RTX 3060 Laptop GPU, results and recommended parameter settings are listed below:
+
+| Remarks                                                                                          | Diffusion Steps | Inference CFG Rate | Max Prompt Length | Block Time (s) | Crossfade Length (s) | Extra context (left) (s) | Extra context (right) (s) | Latency (ms) | Quality | Inference Time per Chunk (ms) |
+|--------------------------------------------------------------------------------------------------|-----------------|--------------------|-------------------|----------------|----------------------|--------------------------|---------------------------|--------------|---------|-------------------------------| 
+| suitable for most voices                                                                         | 10              | 0.7                | 3.0               | 1.0s           | 0.04s                | 0.5s                     | 0.02s                     | 2070ms       | Medium  | 849ms                         |
+| better performance for high-pitched female voices                                                | 20              | 0.7                | 3.0               | 2.0s           | 0.04s                | 0.5s                     | 0.02s                     | 4070ms       | High    | 1585ms                        |
+| suitable for some male voices, as audio quality requirement is lower                             | 5               | 0.7                | 3.0               | 0.6s           | 0.04s                | 0.5s                     | 0.02s                     | 1270ms       | Low     | 488ms                         |
+| Faster inference by setting inference_cfg_rate to 0.0, but not sure whether performance drops... | 10              | 0.0                | 3.0               | 0.7s           | 0.04s                | 0.5s                     | 0.02s                     | 1470ms       | Medium  | 555ms                         |
+
+You can adjust the parameters in the GUI according to your own device performance, the voice conversion stream should work well as long as Inference Time is less than Block Time.  
+Note that inference speed may drop if you are running other GPU intensive tasks (e.g. gaming, watching videos)  
+Generally, latency is around 1~2s to prevent quality drop (the sad nature of diffusion models...😥), but we are keeping on looking for ways to reduce it.  
+
+*(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*
 ## TODO📝
 - [x] Release code
 - [x] Release v0.1 pretrained model: [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-SeedVC-blue)](https://huggingface.co/Plachta/Seed-VC)
 - [x] Huggingface space demo: [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)
 - [x] HTML demo page (maybe with comparisons to other VC models): [Demo](https://plachtaa.github.io/seed-vc/)
-- [ ] Streaming inference (current implementation needs 1~2s latency to prevent quality drop, which is too high to accept...😥)
+- [x] Streaming inference
+- [ ] Reduce streaming inference latency
+- [ ] Demo video for real-time voice conversion
 - [x] Singing voice conversion
 - [ ] Noise resiliency for source & reference audio
     - [x] Source audio is noise resilience
@@ -187,6 +209,8 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
+- 2024-10-27:
+    - Added real-time voice conversion GUI
 - 2024-10-25:
     - Added exhaustive evaluation results and comparisons with RVCv2 for singing voice conversion
 - 2024-10-24:

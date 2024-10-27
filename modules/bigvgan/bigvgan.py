@@ -42,15 +42,15 @@ class AMPBlock1(torch.nn.Module):
     """
 
     def __init__(
-        self,
-        h: AttrDict,
-        channels: int,
-        kernel_size: int = 3,
-        dilation: tuple = (1, 3, 5),
-        activation: str = None,
+            self,
+            h: AttrDict,
+            channels: int,
+            kernel_size: int = 3,
+            dilation: tuple = (1, 3, 5),
+            activation: str = None,
     ):
         super().__init__()
-        
+
         self.h = h
 
         self.convs1 = nn.ModuleList(
@@ -93,7 +93,7 @@ class AMPBlock1(torch.nn.Module):
 
         # Select which Activation1d, lazy-load cuda version to ensure backward compatibility
         if self.h.get("use_cuda_kernel", False):
-            from alias_free_activation.cuda.activation1d import (
+            from .alias_free_activation.cuda.activation1d import (
                 Activation1d as CudaActivation1d,
             )
 
@@ -161,15 +161,15 @@ class AMPBlock2(torch.nn.Module):
     """
 
     def __init__(
-        self,
-        h: AttrDict,
-        channels: int,
-        kernel_size: int = 3,
-        dilation: tuple = (1, 3, 5),
-        activation: str = None,
+            self,
+            h: AttrDict,
+            channels: int,
+            kernel_size: int = 3,
+            dilation: tuple = (1, 3, 5),
+            activation: str = None,
     ):
         super().__init__()
-        
+
         self.h = h
 
         self.convs = nn.ModuleList(
@@ -193,7 +193,7 @@ class AMPBlock2(torch.nn.Module):
 
         # Select which Activation1d, lazy-load cuda version to ensure backward compatibility
         if self.h.get("use_cuda_kernel", False):
-            from alias_free_activation.cuda.activation1d import (
+            from .alias_free_activation.cuda.activation1d import (
                 Activation1d as CudaActivation1d,
             )
 
@@ -270,7 +270,7 @@ class BigVGAN(
 
         # Select which Activation1d, lazy-load cuda version to ensure backward compatibility
         if self.h.get("use_cuda_kernel", False):
-            from alias_free_activation.cuda.activation1d import (
+            from .alias_free_activation.cuda.activation1d import (
                 Activation1d as CudaActivation1d,
             )
 
@@ -304,7 +304,7 @@ class BigVGAN(
                     [
                         weight_norm(
                             ConvTranspose1d(
-                                h.upsample_initial_channel // (2**i),
+                                h.upsample_initial_channel // (2 ** i),
                                 h.upsample_initial_channel // (2 ** (i + 1)),
                                 k,
                                 u,
@@ -320,7 +320,7 @@ class BigVGAN(
         for i in range(len(self.ups)):
             ch = h.upsample_initial_channel // (2 ** (i + 1))
             for j, (k, d) in enumerate(
-                zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)
+                    zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)
             ):
                 self.resblocks.append(
                     resblock_class(h, ch, k, d, activation=h.activation)
@@ -412,20 +412,20 @@ class BigVGAN(
 
     @classmethod
     def _from_pretrained(
-        cls,
-        *,
-        model_id: str,
-        revision: str,
-        cache_dir: str,
-        force_download: bool,
-        proxies: Optional[Dict],
-        resume_download: bool,
-        local_files_only: bool,
-        token: Union[str, bool, None],
-        map_location: str = "cpu",  # Additional argument
-        strict: bool = False,  # Additional argument
-        use_cuda_kernel: bool = False,
-        **model_kwargs,
+            cls,
+            *,
+            model_id: str,
+            revision: str,
+            cache_dir: str,
+            force_download: bool,
+            proxies: Optional[Dict],
+            resume_download: bool,
+            local_files_only: bool,
+            token: Union[str, bool, None],
+            map_location: str = "cpu",  # Additional argument
+            strict: bool = False,  # Additional argument
+            use_cuda_kernel: bool = False,
+            **model_kwargs,
     ):
         """Load Pytorch pretrained weights and return the loaded model."""
 
