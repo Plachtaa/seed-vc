@@ -205,10 +205,12 @@ Generally, latency is around 1~2s to prevent quality drop (the sad nature of dif
 - [x] Changed to BigVGAN from NVIDIA for singing voice decoding
 - [x] Whisper version model for singing voice conversion
 - [x] Objective evaluation and comparison with RVC/SoVITS for singing voice conversion
-- [ ] Improve audio quality
+- [x] Improve audio quality
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
+- 2024-10-28:
+    - Updated fine-tuned 44k singing voice conversion model with better audio quality
 - 2024-10-27:
     - Added real-time voice conversion GUI
 - 2024-10-25:

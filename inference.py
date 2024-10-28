@@ -31,7 +31,7 @@ def load_models(args):
                                                                          "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
     else:
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                                        "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ema.pth",
+                                                                        "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ema_ft.pth",
                                                                         "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")
         # f0 extractor
         from modules.rmvpe import RMVPE
