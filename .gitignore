@@ -20,3 +20,4 @@ test_waves/
 reconstructed/
 .python-version
 ruff.log
+/configs/inuse/

@@ -317,6 +317,7 @@ if __name__ == "__main__":
 
         def load(self):
             try:
+                os.makedirs("configs/inuse", exist_ok=True)
                 if not os.path.exists("configs/inuse/config.json"):
                     shutil.copy("configs/config.json", "configs/inuse/config.json")
                 with open("configs/inuse/config.json", "r") as j:
