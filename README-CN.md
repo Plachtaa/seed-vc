@@ -198,6 +198,7 @@ python real-time-gui.py
     - [x] 类似U-ViT 的skip connection
     - [x] 将输入更改为 OpenAI Whisper
 - [ ] 自定义数据训练代码
+- [ ] 少样本说话人微调
 - [x] 歌声解码器更改为 NVIDIA 的 BigVGAN
 - [x] 44k Hz 歌声转换模型
 - [x] 歌声转换的客观指标评估以及与RVC/SoVITS模型的比较

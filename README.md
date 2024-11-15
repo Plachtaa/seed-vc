@@ -202,6 +202,7 @@ Generally, latency is around 1~2s to prevent quality drop (the sad nature of dif
     - [x] U-ViT style skip connections
     - [x] Changed input to OpenAI Whisper
 - [ ] Code for training on custom data
+- [ ] Few-shot/One-shot speaker fine-tuning
 - [x] Changed to BigVGAN from NVIDIA for singing voice decoding
 - [x] Whisper version model for singing voice conversion
 - [x] Objective evaluation and comparison with RVC/SoVITS for singing voice conversion
