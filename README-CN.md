@@ -202,7 +202,8 @@ python real-time-gui.py
 - [x] 歌声解码器更改为 NVIDIA 的 BigVGAN
 - [x] 44k Hz 歌声转换模型
 - [x] 歌声转换的客观指标评估以及与RVC/SoVITS模型的比较
-- [ ] 提升音质
+- [x] 提升音质
+- [ ] 用于改善歌声转换的NSF歌声解码器
 - [ ] 更多待添加
 
 ## 更新日志 🗒️

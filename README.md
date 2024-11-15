@@ -207,6 +207,7 @@ Generally, latency is around 1~2s to prevent quality drop (the sad nature of dif
 - [x] Whisper version model for singing voice conversion
 - [x] Objective evaluation and comparison with RVC/SoVITS for singing voice conversion
 - [x] Improve audio quality
+- [ ] NSF vocoder for better singing voice conversion
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
