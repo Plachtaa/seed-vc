@@ -8,7 +8,6 @@ huggingface-hub
 munch
 einops
 descript-audio-codec
-git+https://github.com/openai/whisper.git
 gradio
 pydub
 resemblyzer
