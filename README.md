@@ -1,5 +1,5 @@
 # Seed-VC  
-[![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  
+[![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  [![arXiv](https://img.shields.io/badge/arXiv-2411.09943-<COLOR>.svg)](https://arxiv.org/abs/2411.09943)
 
 *English | [简体中文](README-CN.md) | [日本語](README-JP.md)*  
 Currently released model supports *zero-shot voice conversion* 🔊 , *zero-shot real-time voice conversion* 🗣️ and *zero-shot singing voice conversion* 🎶. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
@@ -212,6 +212,8 @@ Generally, latency is around 1~2s to prevent quality drop (the sad nature of dif
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
+- 2024-11-19:
+    - arXiv paper released
 - 2024-10-28:
     - Updated fine-tuned 44k singing voice conversion model with better audio quality
 - 2024-10-27:

@@ -1,5 +1,5 @@
 # Seed-VC
-[![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  
+[![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  [![arXiv](https://img.shields.io/badge/arXiv-2411.09943-<COLOR>.svg)](https://arxiv.org/abs/2411.09943)
 
 *[English](README.md) | 简体中文 | [日本語](README-JP.md)*    
 
@@ -207,6 +207,8 @@ python real-time-gui.py
 - [ ] 更多待添加
 
 ## 更新日志 🗒️
+- 2024-11-19:
+    - paper已提交至arXiv
 - 2024-10-27:
     - 更新了实时变声脚本
 - 2024-10-25:
