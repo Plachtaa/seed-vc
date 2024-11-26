@@ -572,6 +572,37 @@ class RMVPE:
         # t3 = ttime()
         # print("hmvpe:%s\t%s\t%s\t%s"%(t1-t0,t2-t1,t3-t2,t3-t0))
         return f0
+    def infer_from_audio_batch(self, audio, thred=0.03):
+        # torch.cuda.synchronize()
+        # t0 = ttime()
+        if not torch.is_tensor(audio):
+            audio = torch.from_numpy(audio)
+        mel = self.mel_extractor(
+            audio.float().to(self.device), center=True
+        )
+        # print(123123123,mel.device.type)
+        # torch.cuda.synchronize()
+        # t1 = ttime()
+        hidden = self.mel2hidden(mel)
+        # torch.cuda.synchronize()
+        # t2 = ttime()
+        # print(234234,hidden.device.type)
+        if "privateuseone" not in str(self.device):
+            hidden = hidden.cpu().numpy()
+        else:
+            pass
+        if self.is_half == True:
+            hidden = hidden.astype("float32")
+
+        f0s = []
+        for bib in range(hidden.shape[0]):
+            f0s.append(self.decode(hidden[bib], thred=thred))
+        f0s = np.stack(f0s)
+        f0s = torch.from_numpy(f0s).to(self.device)
+        # torch.cuda.synchronize()
+        # t3 = ttime()
+        # print("hmvpe:%s\t%s\t%s\t%s"%(t1-t0,t2-t1,t3-t2,t3-t0))
+        return f0s
 
     def to_local_average_cents(self, salience, thred=0.05):
         # t0 = ttime()

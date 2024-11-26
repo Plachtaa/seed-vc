@@ -87,10 +87,11 @@ class BASECFM(torch.nn.Module, ABC):
                 stacked_style = torch.cat([style, torch.zeros_like(style)], dim=0)
                 stacked_mu = torch.cat([mu, torch.zeros_like(mu)], dim=0)
                 stacked_x = torch.cat([x, x], dim=0)
+                stacked_t = torch.cat([t.unsqueeze(0), t.unsqueeze(0)], dim=0)
 
                 # Perform a single forward pass for both original and CFG inputs
                 stacked_dphi_dt = self.estimator(
-                    stacked_x, stacked_prompt_x, x_lens, t.unsqueeze(0), stacked_style, stacked_mu, None
+                    stacked_x, stacked_prompt_x, x_lens, stacked_t, stacked_style, stacked_mu,
                 )
 
                 # Split the output back into the original and CFG components
@@ -99,7 +100,7 @@ class BASECFM(torch.nn.Module, ABC):
                 # Apply CFG formula
                 dphi_dt = (1.0 + inference_cfg_rate) * dphi_dt - inference_cfg_rate * cfg_dphi_dt
             else:
-                dphi_dt = self.estimator(x, prompt_x, x_lens, t.unsqueeze(0), style, mu, f0)
+                dphi_dt = self.estimator(x, prompt_x, x_lens, t.unsqueeze(0), style, mu)
 
             x = x + dt * dphi_dt
             t = t + dt
@@ -109,6 +110,49 @@ class BASECFM(torch.nn.Module, ABC):
             x[:, :, :prompt_len] = 0
 
         return sol[-1]
+    def forward(self, x1, x_lens, prompt_lens, mu, style):
+        """Computes diffusion loss
+
+        Args:
+            x1 (torch.Tensor): Target
+                shape: (batch_size, n_feats, mel_timesteps)
+            mask (torch.Tensor): target mask
+                shape: (batch_size, 1, mel_timesteps)
+            mu (torch.Tensor): output of encoder
+                shape: (batch_size, n_feats, mel_timesteps)
+            spks (torch.Tensor, optional): speaker embedding. Defaults to None.
+                shape: (batch_size, spk_emb_dim)
+
+        Returns:
+            loss: conditional flow matching loss
+            y: conditional flow
+                shape: (batch_size, n_feats, mel_timesteps)
+        """
+        b, _, t = x1.shape
+
+        # random timestep
+        t = torch.rand([b, 1, 1], device=mu.device, dtype=x1.dtype)
+        # sample noise p(x_0)
+        z = torch.randn_like(x1)
+
+        y = (1 - (1 - self.sigma_min) * t) * z + t * x1
+        u = x1 - (1 - self.sigma_min) * z
+
+        prompt = torch.zeros_like(x1)
+        for bib in range(b):
+            prompt[bib, :, :prompt_lens[bib]] = x1[bib, :, :prompt_lens[bib]]
+            # range covered by prompt are set to 0
+            y[bib, :, :prompt_lens[bib]] = 0
+            if self.zero_prompt_speech_token:
+                mu[bib, :, :prompt_lens[bib]] = 0
+
+        estimator_out = self.estimator(y, prompt, x_lens, t.squeeze(1).squeeze(1), style, mu, prompt_lens)
+        loss = 0
+        for bib in range(b):
+            loss += self.criterion(estimator_out[bib, :, prompt_lens[bib]:x_lens[bib]], u[bib, :, prompt_lens[bib]:x_lens[bib]])
+        loss /= b
+
+        return loss, estimator_out + (1 - self.sigma_min) * z
 
 
 

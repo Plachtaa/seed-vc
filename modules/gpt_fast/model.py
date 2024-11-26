@@ -53,6 +53,7 @@ class ModelArgs:
     has_cross_attention: bool = False
     context_dim: int = 0
     uvit_skip_connection: bool = False
+    time_as_token: bool = False
 
     def __post_init__(self):
         if self.n_local_heads == -1:
@@ -215,6 +216,8 @@ class TransformerBlock(nn.Module):
         else:
             self.uvit_skip_connection = False
 
+        self.time_as_token = config.time_as_token
+
     def forward(self,
                 x: Tensor,
                 c: Tensor,
@@ -226,6 +229,7 @@ class TransformerBlock(nn.Module):
                 cross_attention_mask: Optional[Tensor] = None,
                 skip_in_x: Optional[Tensor] = None,
                 ) -> Tensor:
+        c = None if self.time_as_token else c
         if self.uvit_skip_connection and skip_in_x is not None:
             x = self.skip_in_linear(torch.cat([x, skip_in_x], dim=-1))
         h = x + self.attention(self.attention_norm(x, c), freqs_cis, mask, input_pos)

@@ -118,6 +118,7 @@ class DiT(torch.nn.Module):
             head_dim=args.DiT.hidden_dim // args.DiT.num_heads,
             vocab_size=1024,
             uvit_skip_connection=self.uvit_skip_connection,
+            time_as_token=self.time_as_token,
         )
         self.transformer = Transformer(model_args)
         self.in_channels = args.DiT.in_channels
@@ -134,23 +135,19 @@ class DiT(torch.nn.Module):
 
         self.is_causal = args.DiT.is_causal
 
-        self.n_f0_bins = args.DiT.n_f0_bins
-        self.f0_bins = torch.arange(2, 1024, 1024 // args.DiT.n_f0_bins)
-        self.f0_embedder = nn.Embedding(args.DiT.n_f0_bins, args.DiT.hidden_dim)
-        self.f0_condition = args.DiT.f0_condition
-
         self.t_embedder = TimestepEmbedder(args.DiT.hidden_dim)
-        self.t_embedder2 = TimestepEmbedder(args.wavenet.hidden_dim)
+
         # self.style_embedder1 = weight_norm(nn.Linear(1024, args.DiT.hidden_dim, bias=True))
         # self.style_embedder2 = weight_norm(nn.Linear(1024, args.style_encoder.dim, bias=True))
 
         input_pos = torch.arange(16384)
         self.register_buffer("input_pos", input_pos)
 
-        self.conv1 = nn.Linear(args.DiT.hidden_dim, args.wavenet.hidden_dim)
-        self.conv2 = nn.Conv1d(args.wavenet.hidden_dim, args.DiT.in_channels, 1)
         self.final_layer_type = args.DiT.final_layer_type  # mlp or wavenet
         if self.final_layer_type == 'wavenet':
+            self.t_embedder2 = TimestepEmbedder(args.wavenet.hidden_dim)
+            self.conv1 = nn.Linear(args.DiT.hidden_dim, args.wavenet.hidden_dim)
+            self.conv2 = nn.Conv1d(args.wavenet.hidden_dim, args.DiT.in_channels, 1)
             self.wavenet = WN(hidden_channels=args.wavenet.hidden_dim,
                               kernel_size=args.wavenet.kernel_size,
                               dilation_rate=args.wavenet.dilation_rate,
@@ -159,6 +156,10 @@ class DiT(torch.nn.Module):
                               p_dropout=args.wavenet.p_dropout,
                               causal=False)
             self.final_layer = FinalLayer(args.wavenet.hidden_dim, 1, args.wavenet.hidden_dim)
+            self.res_projection = nn.Linear(args.DiT.hidden_dim,
+                                            args.wavenet.hidden_dim)  # residual connection from tranformer output to final output
+            self.wavenet_style_condition = args.wavenet.style_condition
+            assert args.DiT.style_condition == args.wavenet.style_condition
         else:
             self.final_mlp = nn.Sequential(
                     nn.Linear(args.DiT.hidden_dim, args.DiT.hidden_dim),
@@ -166,12 +167,11 @@ class DiT(torch.nn.Module):
                     nn.Linear(args.DiT.hidden_dim, args.DiT.in_channels),
             )
         self.transformer_style_condition = args.DiT.style_condition
-        self.wavenet_style_condition = args.wavenet.style_condition
-        assert args.DiT.style_condition == args.wavenet.style_condition
+
 
         self.class_dropout_prob = args.DiT.class_dropout_prob
         self.content_mask_embedder = nn.Embedding(1, args.DiT.hidden_dim)
-        self.res_projection = nn.Linear(args.DiT.hidden_dim, args.wavenet.hidden_dim)  # residual connection from tranformer output to final output
+
         self.long_skip_connection = args.DiT.long_skip_connection
         self.skip_linear = nn.Linear(args.DiT.hidden_dim + args.DiT.in_channels, args.DiT.hidden_dim)
 
@@ -183,7 +183,7 @@ class DiT(torch.nn.Module):
 
     def setup_caches(self, max_batch_size, max_seq_length):
         self.transformer.setup_caches(max_batch_size, max_seq_length, use_kv_cache=False)
-    def forward(self, x, prompt_x, x_lens, t, style, cond, f0=None, mask_content=False):
+    def forward(self, x, prompt_x, x_lens, t, style, cond, mask_content=False):
         class_dropout = False
         if self.training and torch.rand(1) < self.class_dropout_prob:
             class_dropout = True
@@ -198,9 +198,6 @@ class DiT(torch.nn.Module):
         t1 = self.t_embedder(t)  # (N, D)
 
         cond = cond_in_module(cond)
-        if self.f0_condition and f0 is not None:
-            quantized_f0 = torch.bucketize(f0, self.f0_bins.to(f0.device))  # (N, T)
-            cond = cond + self.f0_embedder(quantized_f0)
 
         x = x.transpose(1, 2)
         prompt_x = prompt_x.transpose(1, 2)
@@ -221,7 +218,7 @@ class DiT(torch.nn.Module):
         x_mask = sequence_mask(x_lens + self.style_as_token + self.time_as_token).to(x.device).unsqueeze(1)
         input_pos = self.input_pos[:x_in.size(1)]  # (T,)
         x_mask_expanded = x_mask[:, None, :].repeat(1, 1, x_in.size(1), 1) if not self.is_causal else None
-        x_res = self.transformer(x_in, None if self.time_as_token else t1.unsqueeze(1), input_pos, x_mask_expanded)
+        x_res = self.transformer(x_in, t1.unsqueeze(1), input_pos, x_mask_expanded)
         x_res = x_res[:, 1:] if self.time_as_token else x_res
         x_res = x_res[:, 1:] if self.style_as_token else x_res
         if self.long_skip_connection:

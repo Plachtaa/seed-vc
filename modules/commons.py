@@ -428,6 +428,12 @@ def build_model(args, stage="DiT"):
             encoder=encoder,
             quantizer=quantizer,
         )
+    elif stage == "mel_vocos":
+        from modules.vocos import Vocos
+        decoder = Vocos(args)
+        nets = Munch(
+            decoder=decoder,
+        )
     else:
         raise ValueError(f"Unknown stage: {stage}")
 
