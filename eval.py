@@ -55,11 +55,9 @@ mos_computer = DNSMOSComputer(
 )
 
 def load_models(args):
-    # dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-    #                                                                  "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
-    #                                                                  "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
-    dit_checkpoint_path = "../DiT_epoch_00012_step_481500_xlsr_ema.pth"
-    dit_config_path = "./configs/config_dit_mel_seed_uvit_xlsr_tiny.yml"
+    dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+                                                                     "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
+                                                                     "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
     config = yaml.safe_load(open(dit_config_path, "r"))
     model_params = recursive_munch(config["model_params"])
     model = build_model(model_params, stage="DiT")
