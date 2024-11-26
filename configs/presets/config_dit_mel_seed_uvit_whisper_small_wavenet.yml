@@ -1,4 +1,4 @@
-log_dir: "./runs/run_dit_mel_seed_uvit_whisper_small_wavenet"
+log_dir: "./runs"
 save_freq: 1
 log_interval: 10
 save_interval: 1000
@@ -7,8 +7,8 @@ epochs: 1000 # number of epochs for first stage training (pre-training)
 batch_size: 2
 batch_length: 100 # maximum duration of audio in a batch (in seconds)
 max_len: 80 # maximum number of frames
-pretrained_model: ""
-pretrained_encoder: "./temp_ckpt.pth"
+pretrained_model: "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth"
+pretrained_encoder: ""
 load_only_params: False # set to true if do not want to load epoch numbers and optimizer parameters
 
 preprocess_params:

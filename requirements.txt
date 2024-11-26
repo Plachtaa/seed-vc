@@ -16,3 +16,5 @@ transformers
 FreeSimpleGUI
 soundfile
 sounddevice
+modelscope
+funasr

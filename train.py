@@ -27,6 +27,8 @@ class Trainer:
                  batch_size=0,
                  num_workers=0,
                  steps=1000,
+                 save_interval=500,
+                 max_epochs=1000,
                  device="cuda:0",
                  ):
         self.device = device
@@ -38,10 +40,9 @@ class Trainer:
         batch_size = config.get('batch_size', 10) if batch_size == 0 else batch_size
         self.max_steps = steps
 
-        self.n_epochs = config.get('epochs', 200)
+        self.n_epochs = max_epochs
         self.log_interval = config.get('log_interval', 10)
-        self.saving_epoch = config.get('save_freq', 2)
-        self.save_interval = config.get('save_interval', 1000)
+        self.save_interval = save_interval
 
         self.sr = config['preprocess_params'].get('sr', 22050)
         self.hop_length = config['preprocess_params']['spect_params'].get('hop_length', 256)
@@ -97,15 +98,23 @@ class Trainer:
                 ):
                     os.remove(earliest_checkpoint)
                     print(f"Removed {earliest_checkpoint}")
-            else:
+            elif os.path.exists(config.get['pretrained_model', '']):
                 latest_checkpoint = load_custom_model_from_hf("Plachta/Seed-VC", config['pretrained_model'], None)
+            else:
+                latest_checkpoint = ""
         else:
+            assert os.path.exists(pretrained_ckpt_path), f"Pretrained checkpoint {pretrained_ckpt_path} not found"
             latest_checkpoint = pretrained_ckpt_path
 
-        self.model, self.optimizer, self.epoch, self.iters = load_checkpoint(self.model, self.optimizer, latest_checkpoint,
-                                                     load_only_params=True,
-                                                     ignore_modules=[],
-                                                     is_distributed=False)
+        if os.path.exists(latest_checkpoint):
+            self.model, self.optimizer, self.epoch, self.iters = load_checkpoint(self.model, self.optimizer, latest_checkpoint,
+                                                         load_only_params=True,
+                                                         ignore_modules=[],
+                                                         is_distributed=False)
+            print(f"Loaded checkpoint from {latest_checkpoint}")
+        else:
+            self.epoch, self.iters = 0, 0
+            print("Failed to load any checkpoint, this implies you are training from scratch.")
     def build_sv_model(self, device, config):
         # speaker verification model
         from modules.campplus.DTDNN import CAMPPlus
@@ -378,6 +387,8 @@ def main(args):
         run_name=args.run_name,
         batch_size=args.batch_size,
         steps=args.max_steps,
+        max_epochs=args.max_epochs,
+        save_interval=args.save_every,
         num_workers=args.num_workers,
     )
     trainer.train()
@@ -390,6 +401,8 @@ if __name__ == '__main__':
     parser.add_argument('--run-name', type=str, default='my_run')
     parser.add_argument('--batch-size', type=int, default=2)
     parser.add_argument('--max-steps', type=int, default=1000)
+    parser.add_argument('--max-epochs', type=int, default=1000)
+    parser.add_argument('--save-every', type=int, default=500)
     parser.add_argument('--num-workers', type=int, default=0)
     args = parser.parse_args()
     main(args)
