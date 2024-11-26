@@ -1,7 +1,7 @@
 # Seed-VC  
 [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  
 
-*[English](README.md) | [簡体中文](README-CN.md) | 日本語*  
+*[English](README.md) | [簡体中文](README-ZH.md) | 日本語*  
 現在リリースされているモデルは、*ゼロショット音声変換* 🔊 と *ゼロショット歌声変換* 🎙 に対応しています。トレーニングなしで、1〜30秒のリファレンス音声を与えるだけで声をクローンすることができます。  
 
 以前の音声変換モデルとの比較やデモのリストを見つけるには、[デモページ](https://plachtaa.github.io/seed-vc/)🌐 をご覧ください。  

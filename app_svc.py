@@ -27,7 +27,7 @@ from modules.audio import mel_spectrogram
 def load_models(args):
     global sr, hop_length
     # f0 conditioned model
-    if args.checkpoint_path is None:
+    if args.checkpoint_path is None or args.checkpoint_path == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth",
                                                                          "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")

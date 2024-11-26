@@ -121,7 +121,7 @@ def custom_infer(model_set,
     return output
 
 def load_models(args):
-    if args.checkpoint_path is None:
+    if args.checkpoint_path is None or args.checkpoint_path == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_uvit_tat_xlsr_ema.pth",
                                                                          "config_dit_mel_seed_uvit_xlsr_tiny.yml")

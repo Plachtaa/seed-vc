@@ -55,10 +55,11 @@ mos_computer = DNSMOSComputer(
 )
 
 def load_models(args):
-    dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                                     "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
-                                                                     "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
-
+    # dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+    #                                                                  "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
+    #                                                                  "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
+    dit_checkpoint_path = "../DiT_epoch_00012_step_481500_xlsr_ema.pth"
+    dit_config_path = "./configs/config_dit_mel_seed_uvit_xlsr_tiny.yml"
     config = yaml.safe_load(open(dit_config_path, "r"))
     model_params = recursive_munch(config["model_params"])
     model = build_model(model_params, stage="DiT")
@@ -90,38 +91,125 @@ def load_models(args):
     campplus_model.eval()
     campplus_model.to(device)
 
-    from modules.bigvgan import bigvgan
+    vocoder_type = model_params.vocoder.type
 
-    bigvgan_model = bigvgan.BigVGAN.from_pretrained(
-        "nvidia/bigvgan_v2_22khz_80band_256x", use_cuda_kernel=False
-    )
+    if vocoder_type == 'bigvgan':
+        from modules.bigvgan import bigvgan
+        bigvgan_name = model_params.vocoder.name
+        bigvgan_model = bigvgan.BigVGAN.from_pretrained(bigvgan_name, use_cuda_kernel=False)
+        # remove weight norm in the model and set to eval mode
+        bigvgan_model.remove_weight_norm()
+        bigvgan_model = bigvgan_model.eval().to(device)
+        vocoder_fn = bigvgan_model
+    elif vocoder_type == 'hifigan':
+        from modules.hifigan.generator import HiFTGenerator
+        from modules.hifigan.f0_predictor import ConvRNNF0Predictor
+        hift_config = yaml.safe_load(open('configs/hifigan.yml', 'r'))
+        hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
+        hift_gen.load_state_dict(torch.load(hift_config['pretrained_model_path'], map_location='cpu'))
+        hift_gen.eval()
+        hift_gen.to(device)
+        vocoder_fn = hift_gen
+    elif vocoder_type == "vocos":
+        vocos_config = yaml.safe_load(open(model_params.vocoder.vocos.config, 'r'))
+        vocos_path = model_params.vocoder.vocos.path
+        vocos_model_params = recursive_munch(vocos_config['model_params'])
+        vocos = build_model(vocos_model_params, stage='mel_vocos')
+        vocos_checkpoint_path = vocos_path
+        vocos, _, _, _ = load_checkpoint(vocos, None, vocos_checkpoint_path,
+                                         load_only_params=True, ignore_modules=[], is_distributed=False)
+        _ = [vocos[key].eval().to(device) for key in vocos]
+        _ = [vocos[key].to(device) for key in vocos]
+        total_params = sum(sum(p.numel() for p in vocos[key].parameters() if p.requires_grad) for key in vocos.keys())
+        print(f"Vocoder model total parameters: {total_params / 1_000_000:.2f}M")
+        vocoder_fn = vocos.decoder
+    else:
+        raise ValueError(f"Unsupported vocoder type: {vocoder_type}")
 
-    # remove weight norm in the model and set to eval mode
-    bigvgan_model.remove_weight_norm()
-    bigvgan_model = bigvgan_model.eval().to(device)
-
-    if model_params.speech_tokenizer.type == "facodec":
-        ckpt_path, config_path = load_custom_model_from_hf("Plachta/FAcodec", 'pytorch_model.bin', 'config.yml')
-
-        codec_config = yaml.safe_load(open(config_path))
-        codec_model_params = recursive_munch(codec_config['model_params'])
-        codec_encoder = build_model(codec_model_params, stage="codec")
-
-        ckpt_params = torch.load(ckpt_path, map_location="cpu")
-
-        for key in codec_encoder:
-            codec_encoder[key].load_state_dict(ckpt_params[key], strict=False)
-        _ = [codec_encoder[key].eval() for key in codec_encoder]
-        _ = [codec_encoder[key].to(device) for key in codec_encoder]
-        speechtokenizer_set = ('facodec', codec_encoder, None)
-    elif model_params.speech_tokenizer.type == "whisper":
+    speech_tokenizer_type = model_params.speech_tokenizer.type
+    if speech_tokenizer_type == 'whisper':
+        # whisper
         from transformers import AutoFeatureExtractor, WhisperModel
-        whisper_name = model_params.speech_tokenizer.whisper_name if hasattr(model_params.speech_tokenizer,
-                                                                             'whisper_name') else "whisper-large-v3"
+        whisper_name = model_params.speech_tokenizer.name
         whisper_model = WhisperModel.from_pretrained(whisper_name, torch_dtype=torch.float16).to(device)
         del whisper_model.decoder
         whisper_feature_extractor = AutoFeatureExtractor.from_pretrained(whisper_name)
-        speechtokenizer_set = ('whisper', whisper_model, whisper_feature_extractor)
+
+        def semantic_fn(waves_16k):
+            ori_inputs = whisper_feature_extractor([waves_16k.squeeze(0).cpu().numpy()],
+                                                   return_tensors="pt",
+                                                   return_attention_mask=True)
+            ori_input_features = whisper_model._mask_input_features(
+                ori_inputs.input_features, attention_mask=ori_inputs.attention_mask).to(device)
+            with torch.no_grad():
+                ori_outputs = whisper_model.encoder(
+                    ori_input_features.to(whisper_model.encoder.dtype),
+                    head_mask=None,
+                    output_attentions=False,
+                    output_hidden_states=False,
+                    return_dict=True,
+                )
+            S_ori = ori_outputs.last_hidden_state.to(torch.float32)
+            S_ori = S_ori[:, :waves_16k.size(-1) // 320 + 1]
+            return S_ori
+    elif speech_tokenizer_type == 'cnhubert':
+        from transformers import (
+            Wav2Vec2FeatureExtractor,
+            HubertModel,
+        )
+        hubert_model_name = config['model_params']['speech_tokenizer']['name']
+        hubert_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(hubert_model_name)
+        hubert_model = HubertModel.from_pretrained(hubert_model_name)
+        hubert_model = hubert_model.to(device)
+        hubert_model = hubert_model.eval()
+        hubert_model = hubert_model.half()
+
+        def semantic_fn(waves_16k):
+            ori_waves_16k_input_list = [
+                waves_16k[bib].cpu().numpy()
+                for bib in range(len(waves_16k))
+            ]
+            ori_inputs = hubert_feature_extractor(ori_waves_16k_input_list,
+                                                  return_tensors="pt",
+                                                  return_attention_mask=True,
+                                                  padding=True,
+                                                  sampling_rate=16000).to(device)
+            with torch.no_grad():
+                ori_outputs = hubert_model(
+                    ori_inputs.input_values.half(),
+                )
+            S_ori = ori_outputs.last_hidden_state.float()
+            return S_ori
+    elif speech_tokenizer_type == 'xlsr':
+        from transformers import (
+            Wav2Vec2FeatureExtractor,
+            Wav2Vec2Model,
+        )
+        model_name = config['model_params']['speech_tokenizer']['name']
+        output_layer = config['model_params']['speech_tokenizer']['output_layer']
+        wav2vec_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_name)
+        wav2vec_model = Wav2Vec2Model.from_pretrained(model_name)
+        wav2vec_model.encoder.layers = wav2vec_model.encoder.layers[:output_layer]
+        wav2vec_model = wav2vec_model.to(device)
+        wav2vec_model = wav2vec_model.eval()
+        wav2vec_model = wav2vec_model.half()
+
+        def semantic_fn(waves_16k):
+            ori_waves_16k_input_list = [
+                waves_16k[bib].cpu().numpy()
+                for bib in range(len(waves_16k))
+            ]
+            ori_inputs = wav2vec_feature_extractor(ori_waves_16k_input_list,
+                                                   return_tensors="pt",
+                                                   return_attention_mask=True,
+                                                   padding=True,
+                                                   sampling_rate=16000).to(device)
+            with torch.no_grad():
+                ori_outputs = wav2vec_model(
+                    ori_inputs.input_values.half(),
+                )
+            S_ori = ori_outputs.last_hidden_state.float()
+            return S_ori
     else:
         raise ValueError(f"Unsupported speech tokenizer type: {model_params.speech_tokenizer.type}")
     # Generate mel spectrograms
@@ -132,7 +220,7 @@ def load_models(args):
         "num_mels": config['preprocess_params']['spect_params']['n_mels'],
         "sampling_rate": sr,
         "fmin": config['preprocess_params'].get('fmin', 0),
-        "fmax": None if config['preprocess_params'].get('fmax', "None") == "None" else 8000,
+        "fmax": None if config['preprocess_params']['spect_params'].get('fmax', "None") == "None" else 8000,
         "center": False
     }
     from modules.audio import mel_spectrogram
@@ -141,8 +229,8 @@ def load_models(args):
 
     return (
         model,
-        speechtokenizer_set,
-        bigvgan_model,
+        semantic_fn,
+        vocoder_fn,
         campplus_model,
         to_mel,
         mel_fn_args,
@@ -161,6 +249,13 @@ def main(args):
         ).to(device)
     elif args.xvector_extractor == "resemblyzer":
         resemblyzer_encoder = VoiceEncoder()
+    elif args.xvector_extractor == 'wavlm-large':
+        import sys
+        sys.path.append("../UniSpeech/downstreams/speaker_verification")
+        from verification import init_model
+        wavlm_model = init_model("wavlm_large", "D:/wavlm_large_finetune.pth")
+        wavlm_model.cuda()
+        wavlm_model.eval()
     else:
         raise ValueError(f"Unknown xvector extractor: {args.xvector_extractor}")
 
@@ -170,8 +265,8 @@ def main(args):
 
     (
         model,
-        speechtokenizer_set,
-        bigvgan_model,
+        semantic_fn,
+        vocoder_fn,
         campplus_model,
         to_mel,
         mel_fn_args,
@@ -232,8 +327,8 @@ def main(args):
                         source_path,
                         target_path,
                         model,
-                        speechtokenizer_set,
-                        bigvgan_model,
+                        semantic_fn,
+                        vocoder_fn,
                         campplus_model,
                         to_mel,
                         mel_fn_args,
@@ -241,6 +336,7 @@ def main(args):
                         length_adjust,
                         diffusion_steps,
                         inference_cfg_rate,
+                        remove_prompt=args.remove_prompt,
                     )
                     vc_wave_16k = torchaudio.functional.resample(vc_wave, sr, 16000)
                 os.makedirs(osp.join(conversion_result_dir, source_index), exist_ok=True)
@@ -273,6 +369,10 @@ def main(args):
                 ref_embed = resemblyzer_encoder.embed_utterance(ref_wav_resemblyzer)
                 vc_embed = resemblyzer_encoder.embed_utterance(vc_wav_resemblyzer)
                 similarity = np.inner(ref_embed, vc_embed)
+            elif args.xvector_extractor == 'wavlm-large':
+                ref_embed = wavlm_model(ref_waves_16k.to(device)).cpu()
+                vc_embed = wavlm_model(vc_wave_16k.to(device)).cpu()
+                similarity = torch.nn.functional.cosine_similarity(ref_embed, vc_embed, dim=-1)
             else:
                 raise ValueError(f"Unknown xvector extractor: {args.xvector_extractor}")
             print(f"Similarity: {similarity}")
@@ -361,8 +461,8 @@ def convert(
     source_path,
     target_path,
     model,
-    speechtokenizer_set,
-    bigvgan_model,
+    semantic_fn,
+    vocoder_fn,
     campplus_model,
     to_mel,
     mel_fn_args,
@@ -370,6 +470,7 @@ def convert(
     length_adjust,
     diffusion_steps,
     inference_cfg_rate,
+    remove_prompt=False,
 ):
     source_audio = librosa.load(source_path, sr=sr)[0]
     ref_audio = librosa.load(target_path, sr=sr)[0]
@@ -387,61 +488,8 @@ def convert(
     source_waves_16k = torchaudio.functional.resample(source_audio, sr, 16000)
     ref_waves_16k = torchaudio.functional.resample(ref_audio, sr, 16000)
 
-    converted_waves_24k = torchaudio.functional.resample(source_audio, sr, 24000)
-    wave_lengths_24k = torch.LongTensor([converted_waves_24k.size(1)]).to(
-        converted_waves_24k.device
-    )
-    waves_input = converted_waves_24k.unsqueeze(1)
-    if speechtokenizer_set[0] == 'facodec':
-        codec_encoder = speechtokenizer_set[1]
-        z = codec_encoder.encoder(waves_input)
-        (quantized, codes) = codec_encoder.quantizer(z, waves_input)
-        S_alt = torch.cat([codes[1], codes[0]], dim=1)
-
-        # S_ori should be extracted in the same way
-        waves_24k = torchaudio.functional.resample(ref_audio, sr, 24000)
-        waves_input = waves_24k.unsqueeze(1)
-        z = codec_encoder.encoder(waves_input)
-        (quantized, codes) = codec_encoder.quantizer(z, waves_input)
-        S_ori = torch.cat([codes[1], codes[0]], dim=1)
-    elif speechtokenizer_set[0] == 'whisper':
-        whisper_model = speechtokenizer_set[1]
-        whisper_feature_extractor = speechtokenizer_set[2]
-        converted_waves_16k = torchaudio.functional.resample(source_audio, sr, 16000)
-        alt_inputs = whisper_feature_extractor([converted_waves_16k.squeeze(0).cpu().numpy()],
-                                               return_tensors="pt",
-                                               return_attention_mask=True, )
-        alt_input_features = whisper_model._mask_input_features(
-            alt_inputs.input_features, attention_mask=alt_inputs.attention_mask).to(device)
-        with torch.no_grad():
-            alt_outputs = whisper_model.encoder(
-                alt_input_features.to(whisper_model.encoder.dtype),
-                head_mask=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=True,
-            )
-        S_alt = alt_outputs.last_hidden_state.to(torch.float32)
-        S_alt = S_alt[:, :converted_waves_16k.size(-1) // 320 + 1]
-
-        ori_waves_16k = torchaudio.functional.resample(ref_audio, sr, 16000)
-        ori_inputs = whisper_feature_extractor([ori_waves_16k.squeeze(0).cpu().numpy()],
-                                               return_tensors="pt",
-                                               return_attention_mask=True)
-        ori_input_features = whisper_model._mask_input_features(
-            ori_inputs.input_features, attention_mask=ori_inputs.attention_mask).to(device)
-        with torch.no_grad():
-            ori_outputs = whisper_model.encoder(
-                ori_input_features.to(whisper_model.encoder.dtype),
-                head_mask=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=True,
-            )
-        S_ori = ori_outputs.last_hidden_state.to(torch.float32)
-        S_ori = S_ori[:, :ori_waves_16k.size(-1) // 320 + 1]
-    else:
-        raise ValueError(f"Unsupported speech tokenizer type: {speechtokenizer_set[0]}")
+    S_alt = semantic_fn(source_waves_16k)
+    S_ori = semantic_fn(ref_waves_16k)
 
     mel = to_mel(source_audio.to(device).float())
     mel2 = to_mel(ref_audio.to(device).float())
@@ -461,7 +509,11 @@ def convert(
     prompt_condition = model.length_regulator(
         S_ori, ylens=target2_lengths, n_quantizers=3, f0=None
     )[0]
-    cat_condition = torch.cat([prompt_condition, cond], dim=1)
+    if remove_prompt:
+        cat_condition = cond
+        mel2 = torch.zeros([mel2.size(0), mel2.size(1), 0]).to(mel2.device)
+    else:
+        cat_condition = torch.cat([prompt_condition, cond], dim=1)
 
     vc_target = model.cfm.inference(
         cat_condition,
@@ -475,7 +527,7 @@ def convert(
     vc_target = vc_target[:, :, mel2.size(-1) :]
 
     # Convert to waveform
-    vc_wave = bigvgan_model(vc_target).squeeze(1)
+    vc_wave = vocoder_fn(vc_target).squeeze(1)
 
     return ref_waves_16k, vc_wave
 
@@ -491,9 +543,10 @@ if __name__ == "__main__":
     parser.add_argument("--length-adjust", type=float, default=1.0)
     parser.add_argument("--inference-cfg-rate", type=float, default=0.7)
     parser.add_argument(
-        "--xvector-extractor", type=str, default="resemblyzer"
+        "--xvector-extractor", type=str, default="wavlm-large"
     )  # wavlm or resemblyzer
     parser.add_argument("--baseline", type=str, default="") # use "" for Seed-VC
     parser.add_argument("--max-samples", type=int, default=20)
+    parser.add_argument("--remove-prompt", type=bool, default=False)
     args = parser.parse_args()
     main(args)

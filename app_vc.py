@@ -16,7 +16,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def load_models(args):
     global sr, hop_length
-    if args.checkpoint_path is None:
+    if args.checkpoint_path is None or args.checkpoint_path == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
                                                                          "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")

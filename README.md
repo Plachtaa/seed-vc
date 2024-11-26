@@ -1,10 +1,12 @@
 # Seed-VC  
 [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  [![arXiv](https://img.shields.io/badge/arXiv-2411.09943-<COLOR>.svg)](https://arxiv.org/abs/2411.09943)
 
-*English | [简体中文](README-CN.md) | [日本語](README-JP.md)*  
+*English | [简体中文](README-ZH.md) | [日本語](README-JA.md)*  
 Currently released model supports *zero-shot voice conversion* 🔊 , *zero-shot real-time voice conversion* 🗣️ and *zero-shot singing voice conversion* 🎶. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
 
 We support further fine-tuning on custom data to increase performance on specific speaker/speakers, with extremely low data requirement **(minimum 1 utterance per speaker)** and extremely fast training speed **(minimum 100 steps, 2 min on T4)**!
+
+**Real-time voice conversion** is support, with algorithm delay of ~300ms and device side delay of ~100ms, suitable for online meetings, gaming and live streaming.
 
 To find a list of demos and comparisons with previous voice conversion models, please visit our [demo page](https://plachtaa.github.io/seed-vc/)🌐  and [Evaluaiton](EVAL.md)📊.
 
@@ -21,11 +23,11 @@ pip install -r requirements.txt
 ## Usage🛠️
 We have released 3 models for different purposes:
 
-| Version | Name                                                                                                                                                                                                                  | Purpose                       | Sampling Rate | Content Encoder | Vocoder | Hidden Dim | N Layers | Params | Remarks                                                |
-|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|---------------|-----------------|---------|------------|----------|--------|--------------------------------------------------------|
-| v1.0    | seed-uvit-tat-xlsr-tiny ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_uvit_tat_xlsr_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_xlsr_tiny.yml))                                                | Voice Conversion (VC)         | 22050         | XLSR-large      | HIFT    | 384        | 9        | 25M    | suitable for real-time voice conversion                |
-| v1.0    | seed-uvit-whisper-small-wavenet ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_small_wavenet.yml)) | Voice Conversion (VC)         | 22050         | Whisper-small   | BigVGAN | 512        | 13       | 98M    | suitable for offline voice conversion                  |
-| v1.0    | seed-uvit-whisper-base ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_base_f0_44k.yml))       | Singing Voice Conversion (VC) | 44100         | Whisper-small   | BigVGAN | 768        | 17       | 200M   | strong zero-shot performance, singing voice conversion |
+| Version | Name                                                                                                                                                                                                                       | Purpose                        | Sampling Rate | Content Encoder | Vocoder | Hidden Dim | N Layers | Params | Remarks                                                |
+|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|---------------|-----------------|---------|------------|----------|--------|--------------------------------------------------------|
+| v1.0    | seed-uvit-tat-xlsr-tiny ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_uvit_tat_xlsr_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_xlsr_tiny.yml))                                                     | Voice Conversion (VC)          | 22050         | XLSR-large      | HIFT    | 384        | 9        | 25M    | suitable for real-time voice conversion                |
+| v1.0    | seed-uvit-whisper-small-wavenet ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_small_wavenet.yml)) | Voice Conversion (VC)          | 22050         | Whisper-small   | BigVGAN | 512        | 13       | 98M    | suitable for offline voice conversion                  |
+| v1.0    | seed-uvit-whisper-base ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_base_f0_44k.yml))       | Singing Voice Conversion (SVC) | 44100         | Whisper-small   | BigVGAN | 768        | 17       | 200M   | strong zero-shot performance, singing voice conversion |
 
 Checkpoints of the latest model release will be downloaded automatically when first run inference.  
 If you are unable to access huggingface for network reason, try using mirror by adding `HF_ENDPOINT=https://hf-mirror.com` before every command.
@@ -35,7 +37,7 @@ Command line inference:
 python inference.py --source <source-wav>
 --target <referene-wav>
 --output <output-dir>
---diffusion-steps 25 # recommended 50~100 for singingvoice conversion
+--diffusion-steps 25 # recommended 30~50 for singingvoice conversion
 --length-adjust 1.0
 --inference-cfg-rate 0.7
 --f0-condition False # set to True for singing voice conversion
@@ -48,7 +50,7 @@ where:
 - `source` is the path to the speech file to convert to reference voice
 - `target` is the path to the speech file as voice reference
 - `output` is the path to the output directory
-- `diffusion-steps` is the number of diffusion steps to use, default is 25, use 50-100 for best quality, use 4-10 for fastest inference
+- `diffusion-steps` is the number of diffusion steps to use, default is 25, use 30-50 for best quality, use 4-10 for fastest inference
 - `length-adjust` is the length adjustment factor, default is 1.0, set <1.0 for speed-up speech, >1.0 for slow-down speech
 - `inference-cfg-rate` has subtle difference in the output, default is 0.7 
 - `f0-condition` is the flag to condition the pitch of the output to the pitch of the source audio, default is False, set to True for singing voice conversion  
@@ -106,6 +108,7 @@ Fine-tuning on custom data allow the model to clone someone's voice more accurat
     - All audio files should be in on of the following formats: `.wav` `.flac` `.mp3` `.m4a` `.opus` `.ogg`
     - Speaker label is not required, but make sure that each speaker has at least 1 utterance
     - Of course, the more data you have, the better the model will perform
+    - Training data should be as clean as possible, BGM or noise is not desired
 2. Choose a model configuration file from `configs/presets/` for fine-tuning, or create your own to train from scratch.
     - For fine-tuning, it should be one of the following:
         - `./configs/presets/config_dit_mel_seed_uvit_xlsr_tiny.yml` for real-time voice conversion
