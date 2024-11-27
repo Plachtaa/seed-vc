@@ -98,7 +98,7 @@ class Trainer:
                 ):
                     os.remove(earliest_checkpoint)
                     print(f"Removed {earliest_checkpoint}")
-            elif os.path.exists(config.get('pretrained_model', '')):
+            elif config.get('pretrained_model', ''):
                 latest_checkpoint = load_custom_model_from_hf("Plachta/Seed-VC", config['pretrained_model'], None)
             else:
                 latest_checkpoint = ""
