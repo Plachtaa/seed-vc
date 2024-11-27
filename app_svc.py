@@ -431,7 +431,6 @@ def main(args):
                  title="Seed Voice Conversion",
                  examples=examples,
                  cache_examples=False,
-                 share=args.share,
                  ).launch(share=args.share,)
 
 if __name__ == "__main__":
