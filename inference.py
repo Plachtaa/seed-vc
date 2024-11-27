@@ -332,7 +332,7 @@ if __name__ == "__main__":
     parser.add_argument("--diffusion-steps", type=int, default=30)
     parser.add_argument("--length-adjust", type=float, default=1.0)
     parser.add_argument("--inference-cfg-rate", type=float, default=0.7)
-    parser.add_argument("--f0-condition", type=bool, default=True)
+    parser.add_argument("--f0-condition", type=bool, default=False)
     parser.add_argument("--auto-f0-adjust", type=bool, default=True)
     parser.add_argument("--semi-tone-shift", type=int, default=0)
     parser.add_argument("--checkpoint-path", type=str, help="Path to the checkpoint file", default=None)
