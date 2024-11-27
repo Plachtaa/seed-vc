@@ -102,7 +102,8 @@ Note that inference speed may drop if you are running other GPU intensive tasks 
 *(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*
 
 ## Training🏋️
-Fine-tuning on custom data allow the model to clone someone's voice more accurately. It will largely improve speaker similarity on particular speakers, but may slightly increase WER.
+Fine-tuning on custom data allow the model to clone someone's voice more accurately. It will largely improve speaker similarity on particular speakers, but may slightly increase WER.  
+A Colab Tutorial is here for you to follow: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R1BJTqMsTXZzYAVx3j1BiemFXog9pbQG?usp=sharing)
 1. Prepare your own dataset. It has to satisfy the following:
     - File structure does not matter
     - All audio files should be in on of the following formats: `.wav` `.flac` `.mp3` `.m4a` `.opus` `.ogg`
@@ -162,7 +163,7 @@ where:
 - [x] Improve audio quality
 - [ ] NSF vocoder for better singing voice conversion
 - [x] Fix real-time voice conversion artifact while not talking (done by adding a VAD model)
-- [ ] Colab Notebook for fine-tuning example
+- [x] Colab Notebook for fine-tuning example
 - [ ] More to be added
 
 ## CHANGELOGS🗒️

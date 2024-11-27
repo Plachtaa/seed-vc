@@ -94,7 +94,8 @@ python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-conf
 *(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*
 
 ## 训练🏋️
-在自定义数据上进行微调可以让模型更精确地克隆某个人的声音。这将大幅提高特定说话人的相似度，但可能会略微增加 WER（词错误率）。
+在自定义数据上进行微调可以让模型更精确地克隆某个人的声音。这将大幅提高特定说话人的相似度，但可能会略微增加 WER（词错误率）。  
+这里是一个简单的Colab示例以供参考: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R1BJTqMsTXZzYAVx3j1BiemFXog9pbQG?usp=sharing)
 1. 准备您的数据集。必须满足以下要求：
     - 文件结构不重要
     - 所有音频文件必须是以下格式之一：`.wav` `.flac` `.mp3` `.m4a` `.opus` `.ogg`
@@ -154,7 +155,7 @@ where:
 - [x] 提升音质
 - [ ] 用于改善歌声转换的NSF歌声解码器
 - [x] 实时变声脚本添加了VAD模型，避免没有说话时模型输出杂音
-- [ ] Google Colab 笔记本训练脚本以及样例
+- [x] Google Colab 笔记本训练脚本以及样例
 - [ ] 更多待添加
 
 ## 更新日志 🗒️

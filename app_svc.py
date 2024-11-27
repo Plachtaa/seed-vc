@@ -431,11 +431,13 @@ def main(args):
                  title="Seed Voice Conversion",
                  examples=examples,
                  cache_examples=False,
-                 ).launch()
+                 share=args.share,
+                 ).launch(share=args.share,)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-path", type=str, help="Path to the checkpoint file", default=None)
     parser.add_argument("--config-path", type=str, help="Path to the config file", default=None)
+    parser.add_argument("--share", type=bool, help="Whether to share url link", default=False)
     args = parser.parse_args()
     main(args)
