@@ -45,6 +45,7 @@ prompt_condition, mel2, style2 = None, None, None
 reference_wav_name = ""
 
 prompt_len = 3  # in seconds
+ce_dit_difference = 2  # 2 seconds
 @torch.no_grad()
 def custom_infer(model_set,
                  reference_wav,
@@ -61,6 +62,7 @@ def custom_infer(model_set,
     global prompt_condition, mel2, style2
     global reference_wav_name
     global prompt_len
+    global ce_dit_difference
     (
         model,
         semantic_fn,
@@ -94,12 +96,20 @@ def custom_infer(model_set,
         reference_wav_name = new_reference_wav_name
 
     converted_waves_16k = input_wav_res
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+    torch.cuda.synchronize()
+    start_event.record()
     S_alt = semantic_fn(converted_waves_16k.unsqueeze(0))
+    end_event.record()
+    torch.cuda.synchronize()  # Wait for the events to be recorded!
+    elapsed_time_ms = start_event.elapsed_time(end_event)
+    print(f"Time taken for semantic_fn: {elapsed_time_ms}ms")
 
-    target_lengths = torch.LongTensor([(skip_head + return_length + skip_tail) / 50 * sr // hop_length]).to(S_alt.device)
-
+    S_alt = S_alt[:, ce_dit_difference * 50:]
+    target_lengths = torch.LongTensor([(skip_head + return_length + skip_tail - ce_dit_difference * 50) / 50 * sr // hop_length]).to(S_alt.device)
     cond = model.length_regulator(
-        S_alt, ylens=target_lengths, n_quantizers=3, f0=None
+        S_alt, ylens=target_lengths , n_quantizers=3, f0=None
     )[0]
     cat_condition = torch.cat([prompt_condition, cond], dim=1)
     vc_target = model.cfm.inference(
@@ -420,7 +430,7 @@ if __name__ == "__main__":
                         "sr_type": "sr_model",
                         "block_time": 0.5,
                         "crossfade_length": 0.04,
-                        "extra_time": 0.5,
+                        "extra_time": 2.5,
                         "extra_time_right": 0.02,
                         "diffusion_steps": 10,
                         "inference_cfg_rate": 0.7,
@@ -594,7 +604,7 @@ if __name__ == "__main__":
                             [
                                 sg.Text("Extra context time (left)"),
                                 sg.Slider(
-                                    range=(0.5, 10.0),
+                                    range=(2.5, 10.0),
                                     key="extra_time",
                                     resolution=0.1,
                                     orientation="h",

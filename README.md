@@ -94,7 +94,7 @@ Some performance testing has been done on a NVIDIA RTX 3060 Laptop GPU, results 
 
 | Model Configuration             | Diffusion Steps | Inference CFG Rate | Max Prompt Length | Block Time (s) | Crossfade Length (s) | Extra context (left) (s) | Extra context (right) (s) | Latency (ms) | Inference Time per Chunk (ms) |
 |---------------------------------|-----------------|--------------------|-------------------|----------------|----------------------|--------------------------|---------------------------|--------------|-------------------------------| 
-| seed-uvit-xlsr-tiny             | 10              | 0.7                | 3.0               | 0.18s          | 0.04s                | 0.5s                     | 0.02s                     | 430ms        | 150ms                         |
+| seed-uvit-xlsr-tiny             | 10              | 0.7                | 3.0               | 0.18s          | 0.04s                | 2.5s                     | 0.02s                     | 430ms        | 150ms                         |
 
 You can adjust the parameters in the GUI according to your own device performance, the voice conversion stream should work well as long as Inference Time is less than Block Time.  
 Note that inference speed may drop if you are running other GPU intensive tasks (e.g. gaming, watching videos)  
