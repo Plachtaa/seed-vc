@@ -1,5 +1,3 @@
-import os
-os.environ['HF_HUB_CACHE'] = './checkpoints/hf_cache'
 import gradio as gr
 import torch
 import torchaudio
@@ -30,8 +28,6 @@ for key in model:
     model[key].to(device)
 model.cfm.estimator.setup_caches(max_batch_size=1, max_seq_length=8192)
 
-print(f"cfm has {sum(p.numel() for p in model.cfm.parameters() if p.requires_grad)} trainable parameters")
-
 # Load additional modules
 from modules.campplus.DTDNN import CAMPPlus
 
@@ -48,19 +44,6 @@ bigvgan_model = bigvgan.BigVGAN.from_pretrained('nvidia/bigvgan_v2_22khz_80band_
 # remove weight norm in the model and set to eval mode
 bigvgan_model.remove_weight_norm()
 bigvgan_model = bigvgan_model.eval().to(device)
-
-ckpt_path, config_path = load_custom_model_from_hf("Plachta/FAcodec", 'pytorch_model.bin', 'config.yml')
-
-codec_config = yaml.safe_load(open(config_path))
-codec_model_params = recursive_munch(codec_config['model_params'])
-codec_encoder = build_model(codec_model_params, stage="codec")
-
-ckpt_params = torch.load(ckpt_path, map_location="cpu")
-
-for key in codec_encoder:
-    codec_encoder[key].load_state_dict(ckpt_params[key], strict=False)
-_ = [codec_encoder[key].eval() for key in codec_encoder]
-_ = [codec_encoder[key].to(device) for key in codec_encoder]
 
 # whisper
 from transformers import AutoFeatureExtractor, WhisperModel
@@ -79,7 +62,7 @@ mel_fn_args = {
     "num_mels": config['preprocess_params']['spect_params']['n_mels'],
     "sampling_rate": sr,
     "fmin": 0,
-    "fmax": None if config['preprocess_params']['spect_params'].get('fmax') == "None" else config['preprocess_params']['spect_params']['fmax'],
+    "fmax": None,
     "center": False
 }
 from modules.audio import mel_spectrogram
@@ -88,7 +71,7 @@ to_mel = lambda x: mel_spectrogram(x, **mel_fn_args)
 
 # f0 conditioned model
 dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth",
+                                                "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema.pth",
                                                 "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")
 
 config = yaml.safe_load(open(dit_config_path, 'r'))
@@ -118,7 +101,7 @@ mel_fn_args_f0 = {
     "num_mels": config['preprocess_params']['spect_params']['n_mels'],
     "sampling_rate": sr,
     "fmin": 0,
-    "fmax": None if config['preprocess_params']['spect_params'].get('fmax') == "None" else config['preprocess_params']['spect_params']['fmax'],
+    "fmax": None,
     "center": False
 }
 to_mel_f0 = lambda x: mel_spectrogram(x, **mel_fn_args_f0)
@@ -127,15 +110,6 @@ bigvgan_44k_model = bigvgan.BigVGAN.from_pretrained('nvidia/bigvgan_v2_44khz_128
 # remove weight norm in the model and set to eval mode
 bigvgan_44k_model.remove_weight_norm()
 bigvgan_44k_model = bigvgan_44k_model.eval().to(device)
-
-from modules.hifigan.generator import HiFTGenerator
-from modules.hifigan.f0_predictor import ConvRNNF0Predictor
-
-hift_config = yaml.safe_load(open('configs/hifigan.yml', 'r'))
-hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
-hift_gen.load_state_dict(torch.load(hift_config['pretrained_model_path'], map_location='cpu'))
-hift_gen.eval()
-hift_gen.to(device)
 
 def adjust_f0_semitones(f0_sequence, n_semitones):
     factor = 2 ** (n_semitones / 12)
@@ -161,7 +135,7 @@ bitrate = "320k"
 def voice_conversion(source, target, diffusion_steps, length_adjust, inference_cfg_rate, f0_condition, auto_f0_adjust, pitch_shift):
     inference_module = model if not f0_condition else model_f0
     mel_fn = to_mel if not f0_condition else to_mel_f0
-    bigvgan_fn = hift_gen if not f0_condition else bigvgan_44k_model
+    bigvgan_fn = bigvgan_model if not f0_condition else bigvgan_44k_model
     sr = 22050 if not f0_condition else 44100
     # Load audio
     source_audio = librosa.load(source, sr=sr)[0]
@@ -302,8 +276,6 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                                                    inference_cfg_rate=inference_cfg_rate)
         vc_target = vc_target[:, :, mel2.size(-1):]
         vc_wave = bigvgan_fn(vc_target)[0]
-        if vc_wave.ndim == 1:
-            vc_wave = vc_wave.unsqueeze(0)
         if processed_frames == 0:
             if is_last_chunk:
                 output_wave = vc_wave[0].cpu().numpy()
