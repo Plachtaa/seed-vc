@@ -45,6 +45,7 @@ python inference.py --source <source-wav>
 --semi-tone-shift 0 # pitch shift in semitones for singing voice conversion
 --checkpoint <path-to-checkpoint>
 --config <path-to-config>
+ --fp16 True
 ```
 where:
 - `source` is the path to the speech file to convert to reference voice
@@ -58,11 +59,11 @@ where:
 - `semi-tone-shift` is the pitch shift in semitones for singing voice conversion, default is 0  
 - `checkpoint` is the path to the model checkpoint if you have trained or fine-tuned your own model, leave to blank to auto-download default model from huggingface.(`seed-uvit-whisper-small-wavenet` if `f0-condition` is `False` else `seed-uvit-whisper-base`)
 - `config` is the path to the model config if you have trained or fine-tuned your own model, leave to blank to auto-download default config from huggingface  
-
+- `fp16` is the flag to use float16 inference, default is True
 
 Voice Conversion Web UI:
 ```bash
-python app_vc.py --checkpoint <path-to-checkpoint> --config <path-to-config>
+python app_vc.py --checkpoint <path-to-checkpoint> --config <path-to-config> --fp16 True
 ```
 - `checkpoint` is the path to the model checkpoint if you have trained or fine-tuned your own model, leave to blank to auto-download default model from huggingface. (`seed-uvit-whisper-small-wavenet`)
 - `config` is the path to the model config if you have trained or fine-tuned your own model, leave to blank to auto-download default config from huggingface  
@@ -71,7 +72,7 @@ Then open the browser and go to `http://localhost:7860/` to use the web interfac
 
 Singing Voice Conversion Web UI:
 ```bash
-python app_svc.py --checkpoint <path-to-checkpoint> --config <path-to-config>
+python app_svc.py --checkpoint <path-to-checkpoint> --config <path-to-config> --fp16 True
 ```
 - `checkpoint` is the path to the model checkpoint if you have trained or fine-tuned your own model, leave to blank to auto-download default model from huggingface. (`seed-uvit-whisper-base`)
 - `config` is the path to the model config if you have trained or fine-tuned your own model, leave to blank to auto-download default config from huggingface  

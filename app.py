@@ -269,13 +269,14 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
         chunk_cond = cond[:, processed_frames:processed_frames + max_source_window]
         is_last_chunk = processed_frames + max_source_window >= cond.size(1)
         cat_condition = torch.cat([prompt_condition, chunk_cond], dim=1)
-        # Voice Conversion
-        vc_target = inference_module.cfm.inference(cat_condition,
-                                                   torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
-                                                   mel2, style2, None, diffusion_steps,
-                                                   inference_cfg_rate=inference_cfg_rate)
-        vc_target = vc_target[:, :, mel2.size(-1):]
-        vc_wave = bigvgan_fn(vc_target)[0]
+        with torch.autocast(device_type=device.type, dtype=torch.float16):
+            # Voice Conversion
+            vc_target = inference_module.cfm.inference(cat_condition,
+                                                       torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
+                                                       mel2, style2, None, diffusion_steps,
+                                                       inference_cfg_rate=inference_cfg_rate)
+            vc_target = vc_target[:, :, mel2.size(-1):]
+            vc_wave = bigvgan_fn(vc_target)[0]
         if processed_frames == 0:
             if is_last_chunk:
                 output_wave = vc_wave[0].cpu().numpy()

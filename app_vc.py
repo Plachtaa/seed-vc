@@ -4,7 +4,7 @@ import gradio as gr
 import torch
 import torchaudio
 import librosa
-from modules.commons import build_model, load_checkpoint, recursive_munch
+from modules.commons import build_model, load_checkpoint, recursive_munch, str2bool
 import yaml
 from hf_utils import load_custom_model_from_hf
 import numpy as np
@@ -13,9 +13,12 @@ import argparse
 
 # Load model and configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+fp16 = False
 def load_models(args):
-    global sr, hop_length
+    global sr, hop_length, fp16
+    fp16 = args.fp16
+    print(f"Using device: {device}")
+    print(f"Using fp16: {fp16}")
     if args.checkpoint_path is None or args.checkpoint_path == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
@@ -285,13 +288,14 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
         chunk_cond = cond[:, processed_frames:processed_frames + max_source_window]
         is_last_chunk = processed_frames + max_source_window >= cond.size(1)
         cat_condition = torch.cat([prompt_condition, chunk_cond], dim=1)
-        # Voice Conversion
-        vc_target = inference_module.cfm.inference(cat_condition,
-                                                   torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
-                                                   mel2, style2, None, diffusion_steps,
-                                                   inference_cfg_rate=inference_cfg_rate)
-        vc_target = vc_target[:, :, mel2.size(-1):]
-        vc_wave = vocoder_fn(vc_target)[0]
+        with torch.autocast(device_type=device.type, dtype=torch.float16 if fp16 else torch.float32):
+            # Voice Conversion
+            vc_target = inference_module.cfm.inference(cat_condition,
+                                                       torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
+                                                       mel2, style2, None, diffusion_steps,
+                                                       inference_cfg_rate=inference_cfg_rate)
+            vc_target = vc_target[:, :, mel2.size(-1):]
+            vc_wave = vocoder_fn(vc_target)[0]
         if vc_wave.ndim == 1:
             vc_wave = vc_wave.unsqueeze(0)
         if processed_frames == 0:
@@ -380,6 +384,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-path", type=str, help="Path to the checkpoint file", default=None)
     parser.add_argument("--config-path", type=str, help="Path to the config file", default=None)
-    parser.add_argument("--share", type=bool, help="Whether to share url link", default=False)
+    parser.add_argument("--share", type=str2bool, nargs="?", const=True, default=False, help="Whether to share the app")
+    parser.add_argument("--fp16", type=str2bool, nargs="?", const=True, help="Whether to use fp16", default=True)
     args = parser.parse_args()
     main(args)

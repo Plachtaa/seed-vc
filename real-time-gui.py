@@ -27,15 +27,8 @@ from hf_utils import load_custom_model_from_hf
 
 import os
 import sys
-import argparse
-import time
-import numpy as np
 import torch
-import torch.nn.functional as F
-import torchaudio.transforms as tat
-import librosa
-import soundfile as sf
-
+from modules.commons import str2bool
 # Load model and configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -45,7 +38,8 @@ prompt_condition, mel2, style2 = None, None, None
 reference_wav_name = ""
 
 prompt_len = 3  # in seconds
-ce_dit_difference = 2  # 2 seconds
+ce_dit_difference = 2.0  # 2 seconds
+fp16 = False
 @torch.no_grad()
 def custom_infer(model_set,
                  reference_wav,
@@ -58,6 +52,7 @@ def custom_infer(model_set,
                  diffusion_steps,
                  inference_cfg_rate,
                  max_prompt_length,
+                 cd_difference=2.0,
                  ):
     global prompt_condition, mel2, style2
     global reference_wav_name
@@ -73,6 +68,9 @@ def custom_infer(model_set,
     ) = model_set
     sr = mel_fn_args["sampling_rate"]
     hop_length = mel_fn_args["hop_size"]
+    if ce_dit_difference != cd_difference:
+        ce_dit_difference = cd_difference
+        print(f"Setting ce_dit_difference to {cd_difference} seconds.")
     if prompt_condition is None or reference_wav_name != new_reference_wav_name or prompt_len != max_prompt_length:
         prompt_len = max_prompt_length
         print(f"Setting max prompt length to {max_prompt_length} seconds.")
@@ -106,24 +104,27 @@ def custom_infer(model_set,
     elapsed_time_ms = start_event.elapsed_time(end_event)
     print(f"Time taken for semantic_fn: {elapsed_time_ms}ms")
 
-    S_alt = S_alt[:, ce_dit_difference * 50:]
-    target_lengths = torch.LongTensor([(skip_head + return_length + skip_tail - ce_dit_difference * 50) / 50 * sr // hop_length]).to(S_alt.device)
+    ce_dit_frame_difference = int(ce_dit_difference * 50)
+    S_alt = S_alt[:, ce_dit_frame_difference:]
+    target_lengths = torch.LongTensor([(skip_head + return_length + skip_tail - ce_dit_frame_difference) / 50 * sr // hop_length]).to(S_alt.device)
+    print(f"target_lengths: {target_lengths}")
     cond = model.length_regulator(
         S_alt, ylens=target_lengths , n_quantizers=3, f0=None
     )[0]
     cat_condition = torch.cat([prompt_condition, cond], dim=1)
-    vc_target = model.cfm.inference(
-        cat_condition,
-        torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
-        mel2,
-        style2,
-        None,
-        n_timesteps=diffusion_steps,
-        inference_cfg_rate=inference_cfg_rate,
-    )
-    vc_target = vc_target[:, :, mel2.size(-1) :]
-    print(f"vc_target.shape: {vc_target.shape}")
-    vc_wave = vocoder_fn(vc_target).squeeze()
+    with torch.autocast(device_type=device.type, dtype=torch.float16 if fp16 else torch.float32):
+        vc_target = model.cfm.inference(
+            cat_condition,
+            torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
+            mel2,
+            style2,
+            None,
+            n_timesteps=diffusion_steps,
+            inference_cfg_rate=inference_cfg_rate,
+        )
+        vc_target = vc_target[:, :, mel2.size(-1) :]
+        print(f"vc_target.shape: {vc_target.shape}")
+        vc_wave = vocoder_fn(vc_target).squeeze()
     output_len = return_length * sr // 50
     tail_len = skip_tail * sr // 50
     output = vc_wave[-output_len - tail_len: -tail_len]
@@ -131,6 +132,8 @@ def custom_infer(model_set,
     return output
 
 def load_models(args):
+    global fp16
+    fp16 = args.fp16
     if args.checkpoint_path is None or args.checkpoint_path == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_uvit_tat_xlsr_ema.pth",
@@ -357,7 +360,8 @@ if __name__ == "__main__":
             self.block_time: float = 0.25  # s
             self.threhold: int = -60
             self.crossfade_time: float = 0.05
-            self.extra_time: float = 2.5
+            self.extra_time_ce: float = 2.5
+            self.extra_time: float = 0.5
             self.extra_time_right: float = 2.0
             self.I_noise_reduce: bool = False
             self.O_noise_reduce: bool = False
@@ -431,7 +435,8 @@ if __name__ == "__main__":
                         "sr_type": "sr_model",
                         "block_time": 0.5,
                         "crossfade_length": 0.04,
-                        "extra_time": 2.5,
+                        "extra_time_ce": 2.5,
+                        "extra_time": 0.5,
                         "extra_time_right": 0.02,
                         "diffusion_steps": 10,
                         "inference_cfg_rate": 0.7,
@@ -603,9 +608,20 @@ if __name__ == "__main__":
                                 ),
                             ],
                             [
-                                sg.Text("Extra context time (left)"),
+                                sg.Text("Extra content encoder context time (left)"),
                                 sg.Slider(
-                                    range=(2.5, 10.0),
+                                    range=(0.5, 10.0),
+                                    key="extra_time_ce",
+                                    resolution=0.1,
+                                    orientation="h",
+                                    default_value=data.get("extra_time_ce", 5.0),
+                                    enable_events=True,
+                                ),
+                            ],
+                            [
+                                sg.Text("Extra DiT context time (left)"),
+                                sg.Slider(
+                                    range=(0.5, 10.0),
                                     key="extra_time",
                                     resolution=0.1,
                                     orientation="h",
@@ -706,6 +722,7 @@ if __name__ == "__main__":
                             "max_prompt_length": values["max_prompt_length"],
                             "block_time": values["block_time"],
                             "crossfade_length": values["crossfade_length"],
+                            "extra_time_ce": values["extra_time_ce"],
                             "extra_time": values["extra_time"],
                             "extra_time_right": values["extra_time_right"],
                         }
@@ -762,6 +779,7 @@ if __name__ == "__main__":
             self.gui_config.max_prompt_length = values["max_prompt_length"]
             self.gui_config.block_time = values["block_time"]
             self.gui_config.crossfade_time = values["crossfade_length"]
+            self.gui_config.extra_time_ce = values["extra_time_ce"]
             self.gui_config.extra_time = values["extra_time"]
             self.gui_config.extra_time_right = values["extra_time_right"]
             return True
@@ -804,7 +822,7 @@ if __name__ == "__main__":
             self.extra_frame = (
                 int(
                     np.round(
-                        self.gui_config.extra_time
+                        self.gui_config.extra_time_ce
                         * self.gui_config.samplerate
                         / self.zc
                     )
@@ -971,6 +989,8 @@ if __name__ == "__main__":
             print(f"preprocess time: {time.perf_counter() - start_time:.2f}")
             # infer
             if self.function == "vc":
+                if self.gui_config.extra_time_ce - self.gui_config.extra_time < 0:
+                    raise ValueError("Content encoder extra context must be greater than DiT extra context!")
                 start_event = torch.cuda.Event(enable_timing=True)
                 end_event = torch.cuda.Event(enable_timing=True)
                 torch.cuda.synchronize()
@@ -987,6 +1007,7 @@ if __name__ == "__main__":
                     int(self.gui_config.diffusion_steps),
                     self.gui_config.inference_cfg_rate,
                     self.gui_config.max_prompt_length,
+                    self.gui_config.extra_time_ce - self.gui_config.extra_time,
                 )
                 if self.resampler2 is not None:
                     infer_wav = self.resampler2(infer_wav)
@@ -1114,5 +1135,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-path", type=str, default=None, help="Path to the model checkpoint")
     parser.add_argument("--config-path", type=str, default=None, help="Path to the vocoder checkpoint")
+    parser.add_argument("--fp16", type=str2bool, nargs="?", const=True, help="Whether to use fp16", default=True)
     args = parser.parse_args()
     gui = GUI(args)

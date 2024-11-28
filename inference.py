@@ -16,15 +16,17 @@ import time
 
 import torchaudio
 import librosa
-import torchaudio.compliance.kaldi as kaldi
+from modules.commons import str2bool
 
 from hf_utils import load_custom_model_from_hf
 
 
 # Load model and configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+fp16 = False
 def load_models(args):
+    global fp16
+    fp16 = args.fp16
     if not args.f0_condition:
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
@@ -304,17 +306,17 @@ def main(args):
     cat_condition = torch.cat([prompt_condition, cond], dim=1)
 
     time_vc_start = time.time()
-    vc_target = model.cfm.inference(
-            cat_condition,
-            torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
-            mel2, style2, None, diffusion_steps,
-            inference_cfg_rate=inference_cfg_rate)
-    vc_target = vc_target[:, :, mel2.size(-1):]
+    with torch.autocast(device_type=device.type, dtype=torch.float16 if fp16 else torch.float32):
+        vc_target = model.cfm.inference(
+                cat_condition,
+                torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
+                mel2, style2, None, diffusion_steps,
+                inference_cfg_rate=inference_cfg_rate)
+        vc_target = vc_target[:, :, mel2.size(-1):]
 
-
-    # Convert to waveform
-    vc_wave = vocoder_fn(vc_target).squeeze()  # wav_gen is FloatTensor with shape [B(1), 1, T_time] and values in [-1, 1]
-    vc_wave = vc_wave[None, :]
+        # Convert to waveform
+        vc_wave = vocoder_fn(vc_target).squeeze()  # wav_gen is FloatTensor with shape [B(1), 1, T_time] and values in [-1, 1]
+    vc_wave = vc_wave[None, :].float()
     time_vc_end = time.time()
     print(f"RTF: {(time_vc_end - time_vc_start) / vc_wave.size(-1) * sr}")
 
@@ -332,10 +334,11 @@ if __name__ == "__main__":
     parser.add_argument("--diffusion-steps", type=int, default=30)
     parser.add_argument("--length-adjust", type=float, default=1.0)
     parser.add_argument("--inference-cfg-rate", type=float, default=0.7)
-    parser.add_argument("--f0-condition", type=bool, default=False)
-    parser.add_argument("--auto-f0-adjust", type=bool, default=True)
+    parser.add_argument("--f0-condition", type=str2bool, default=True)
+    parser.add_argument("--auto-f0-adjust", type=str2bool, default=True)
     parser.add_argument("--semi-tone-shift", type=int, default=0)
     parser.add_argument("--checkpoint-path", type=str, help="Path to the checkpoint file", default=None)
     parser.add_argument("--config-path", type=str, help="Path to the config file", default=None)
+    parser.add_argument("--fp16", type=str2bool, default=True)
     args = parser.parse_args()
     main(args)
