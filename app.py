@@ -125,9 +125,7 @@ def crossfade(chunk1, chunk2, overlap):
     return chunk2
 
 # streaming and chunk processing related params
-max_context_window = sr // hop_length * 30
 overlap_frame_len = 16
-overlap_wave_len = overlap_frame_len * hop_length
 bitrate = "320k"
 
 @torch.no_grad()
@@ -137,6 +135,9 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     mel_fn = to_mel if not f0_condition else to_mel_f0
     bigvgan_fn = bigvgan_model if not f0_condition else bigvgan_44k_model
     sr = 22050 if not f0_condition else 44100
+    hop_length = 256 if not f0_condition else 512
+    max_context_window = sr // hop_length * 30
+    overlap_wave_len = overlap_frame_len * hop_length
     # Load audio
     source_audio = librosa.load(source, sr=sr)[0]
     ref_audio = librosa.load(target, sr=sr)[0]
