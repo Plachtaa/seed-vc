@@ -434,7 +434,7 @@ if __name__ == "__main__":
                             self.output_devices_indices.index(sd.default.device[1])
                         ],
                         "sr_type": "sr_model",
-                        "block_time": 0.5,
+                        "block_time": 0.3,
                         "crossfade_length": 0.04,
                         "extra_time_ce": 2.5,
                         "extra_time": 0.5,

@@ -100,6 +100,8 @@ Some performance testing has been done on a NVIDIA RTX 3060 Laptop GPU, results 
 You can adjust the parameters in the GUI according to your own device performance, the voice conversion stream should work well as long as Inference Time is less than Block Time.  
 Note that inference speed may drop if you are running other GPU intensive tasks (e.g. gaming, watching videos)  
 
+You may wish to use [VB-CABLE](https://vb-audio.com/Cable/) to route audio from GUI output stream to a virtual microphone.  
+
 *(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*
 
 ## Training🏋️
