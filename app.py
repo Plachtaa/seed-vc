@@ -229,8 +229,8 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     style2 = campplus_model(feat2.unsqueeze(0))
 
     if f0_condition:
-        F0_ori = rmvpe.infer_from_audio(ref_waves_16k[0], thred=0.5)
-        F0_alt = rmvpe.infer_from_audio(converted_waves_16k[0], thred=0.5)
+        F0_ori = rmvpe.infer_from_audio(ref_waves_16k[0], thred=0.03)
+        F0_alt = rmvpe.infer_from_audio(converted_waves_16k[0], thred=0.03)
 
         F0_ori = torch.from_numpy(F0_ori).to(device)[None]
         F0_alt = torch.from_numpy(F0_alt).to(device)[None]

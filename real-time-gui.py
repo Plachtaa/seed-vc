@@ -134,6 +134,7 @@ def custom_infer(model_set,
 def load_models(args):
     global fp16
     fp16 = args.fp16
+    print(f"Using fp16: {fp16}")
     if args.checkpoint_path is None or args.checkpoint_path == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_uvit_tat_xlsr_ema.pth",

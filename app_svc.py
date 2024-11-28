@@ -291,8 +291,8 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     feat2 = feat2 - feat2.mean(dim=0, keepdim=True)
     style2 = campplus_model(feat2.unsqueeze(0))
 
-    F0_ori = f0_fn(ref_waves_16k[0], thred=0.5)
-    F0_alt = f0_fn(converted_waves_16k[0], thred=0.5)
+    F0_ori = f0_fn(ref_waves_16k[0], thred=0.03)
+    F0_alt = f0_fn(converted_waves_16k[0], thred=0.03)
 
     F0_ori = torch.from_numpy(F0_ori).to(device)[None]
     F0_alt = torch.from_numpy(F0_alt).to(device)[None]
@@ -329,14 +329,14 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
         chunk_f0 = interpolated_shifted_f0_alt[:, processed_frames:processed_frames + max_source_window]
         is_last_chunk = processed_frames + max_source_window >= cond.size(1)
         cat_condition = torch.cat([prompt_condition, chunk_cond], dim=1)
-        with torch.autocast(device_type=device.type, dtype=torch.float16 if fp16 else torch.float32):
-            # Voice Conversion
-            vc_target = inference_module.cfm.inference(cat_condition,
-                                                       torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
-                                                       mel2, style2, None, diffusion_steps,
-                                                       inference_cfg_rate=inference_cfg_rate)
-            vc_target = vc_target[:, :, mel2.size(-1):]
-            vc_wave = vocoder_fn(vc_target).squeeze().cpu()
+        # with torch.autocast(device_type=device.type, dtype=torch.float16 if fp16 else torch.float32):
+        # Voice Conversion
+        vc_target = inference_module.cfm.inference(cat_condition,
+                                                   torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
+                                                   mel2, style2, None, diffusion_steps,
+                                                   inference_cfg_rate=inference_cfg_rate)
+        vc_target = vc_target[:, :, mel2.size(-1):]
+        vc_wave = vocoder_fn(vc_target).squeeze().cpu()
         if vc_wave.ndim == 1:
             vc_wave = vc_wave.unsqueeze(0)
         if processed_frames == 0:
