@@ -154,7 +154,7 @@ where:
 - [x] HTML demo page: [Demo](https://plachtaa.github.io/seed-vc/)
 - [x] Streaming inference
 - [x] Reduce streaming inference latency
-- [ ] Demo video for real-time voice conversion
+- [x] Demo video for real-time voice conversion
 - [x] Singing voice conversion
 - [x] Noise resiliency for source audio
 - [ ] Potential architecture improvements

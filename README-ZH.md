@@ -2,6 +2,9 @@
 [![Hugging Face](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/Plachta/Seed-VC)  [![arXiv](https://img.shields.io/badge/arXiv-2411.09943-<COLOR>.svg)](https://arxiv.org/abs/2411.09943)
 
 *English | [简体中文](README-ZH.md) | [日本語](README-JA.md)*  
+
+[real-time-demo.webm](https://github.com/user-attachments/assets/86325c5e-f7f6-4a04-8695-97275a5d046c)
+
 目前发布的模型支持 *零样本语音转换* 🔊 、*零样本实时语音转换* 🗣️ 和 *零样本歌声转换* 🎶。无需任何训练，只需1~30秒的参考语音，即可克隆声音。
 
 我们支持进一步使用自定义数据进行微调，以提高特定说话人的性能，数据需求门槛极低 **（每位说话人至少1条语音）** ，训练速度极快 **（最少100步，在T4上只需2分钟）**！
@@ -91,6 +94,8 @@ python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-conf
 
 你可以根据设备性能调整 GUI 中的参数，只要推理时间小于块时间，语音转换流就可以正常工作。 注意，如果你正在运行其他占用 GPU 的任务（如游戏、看视频），推理速度可能会下降。
 
+你可以使用 [VB-CABLE](https://vb-audio.com/Cable/) 将变声器输出映射到一个虚拟麦克风上，以便其它应用读取.  
+
 *(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*
 
 ## 训练🏋️
@@ -140,7 +145,7 @@ where:
 - [x] HTML 演示页面： [Demo](https://plachtaa.github.io/seed-vc/)
 - [x] 流式推理
 - [x] 降低延迟
-- [ ] 实时变声Demo视频
+- [x] 实时变声Demo视频
 - [x] 歌声转换
 - [x] 提高源音频抗噪性
 - [ ] 潜在的架构改进
