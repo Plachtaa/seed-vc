@@ -457,7 +457,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     
-    #local_cache_dir="./cachedir"
+    local_cache_dir="./cachedir"
 
     main(in_source=args.source, 
          in_target=args.target,
