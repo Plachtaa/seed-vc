@@ -3,7 +3,7 @@
 
 *English | [简体中文](README-ZH.md) | [日本語](README-JA.md)*  
 
-<video src="./assets/real-time-demo.webm"></video>
+[real-time-demo.webm](https://github.com/user-attachments/assets/86325c5e-f7f6-4a04-8695-97275a5d046c)
 
 Currently released model supports *zero-shot voice conversion* 🔊 , *zero-shot real-time voice conversion* 🗣️ and *zero-shot singing voice conversion* 🎶. Without any training, it is able to clone a voice given a reference speech of 1~30 seconds.  
 
