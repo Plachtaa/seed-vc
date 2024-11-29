@@ -1,3 +1,4 @@
+ 
 import os
 
 import numpy as np
@@ -27,26 +28,26 @@ from hf_utils import load_custom_model_from_hf
 # Load model and configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 fp16 = False
-def load_models(args):
+def load_models( f0_condition=False, checkpoint_path=None, config_path=None, infp16=False, cache_dir="./cachedir" ):
     global fp16
-    fp16 = args.fp16
-    if not args.f0_condition:
+    fp16 = infp16
+    if not f0_condition:
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
-                                                                         "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
+                                                                         "config_dit_mel_seed_uvit_whisper_small_wavenet.yml", cache_dir=cache_dir)
         f0_fn = None
     else:
-        if args.checkpoint_path is None:
+        if checkpoint_path is None:
             dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                              "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth",
-                                                                             "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")
+                                                                             "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml", cache_dir=cache_dir)
         else:
-            dit_checkpoint_path = args.checkpoint_path
-            dit_config_path = args.config_path
+            dit_checkpoint_path = checkpoint_path
+            dit_config_path = config_path
         # f0 extractor
         from modules.rmvpe import RMVPE
 
-        model_path = load_custom_model_from_hf("lj1995/VoiceConversionWebUI", "rmvpe.pt", None)
+        model_path = load_custom_model_from_hf("lj1995/VoiceConversionWebUI", "rmvpe.pt", None, cache_dir=cache_dir)
         f0_extractor = RMVPE(model_path, is_half=False, device=device)
         f0_fn = f0_extractor.infer_from_audio
 
@@ -75,7 +76,7 @@ def load_models(args):
     from modules.campplus.DTDNN import CAMPPlus
 
     campplus_ckpt_path = load_custom_model_from_hf(
-        "funasr/campplus", "campplus_cn_common.bin", config_filename=None
+        "funasr/campplus", "campplus_cn_common.bin", config_filename=None, cache_dir=cache_dir
     )
     campplus_model = CAMPPlus(feat_dim=80, embedding_size=192)
     campplus_model.load_state_dict(torch.load(campplus_ckpt_path, map_location="cpu"))
@@ -97,7 +98,7 @@ def load_models(args):
         from modules.hifigan.f0_predictor import ConvRNNF0Predictor
         hift_config = yaml.safe_load(open('configs/hifigan.yml', 'r'))
         hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
-        hift_path = load_custom_model_from_hf("FunAudioLLM/CosyVoice-300M", 'hift.pt', None)
+        hift_path = load_custom_model_from_hf("FunAudioLLM/CosyVoice-300M", 'hift.pt', None, cache_dir=cache_dir)
         hift_gen.load_state_dict(torch.load(hift_path, map_location='cpu'))
         hift_gen.eval()
         hift_gen.to(device)
@@ -243,18 +244,58 @@ def crossfade(chunk1, chunk2, overlap):
     return chunk2
 
 @torch.no_grad()
-def main(args):
-    model, semantic_fn, f0_fn, vocoder_fn, campplus_model, mel_fn, mel_fn_args = load_models(args)
-    sr = mel_fn_args['sampling_rate']
-    f0_condition = args.f0_condition
-    auto_f0_adjust = args.auto_f0_adjust
-    pitch_shift = args.semi_tone_shift
+def main(    
+        in_source: str = "./examples/source/source_s1.wav",
+        in_target: str = "./examples/reference/s1p1.wav",
+        in_output: str = "./",
+        in_diffusion_steps: int = 30,
+        in_length_adjust: float = 1.0,
+        in_inference_cfg_rate: float = 0.7,
+        in_f0_condition: bool = False,
+        in_auto_f0_adjust: bool = False,
+        in_semi_tone_shift: int = 0,
+        in_checkpoint_path: str = None,
+        in_config_path: str = None,
+        in_fp16: bool = True,
+        in_cache_dir="./cachedir",
+        in_output_filename=None
+    ):
+    """
+    Process audio files with the given parameters.
+    
+    Args:
+        source (str): Path to the source audio file.
+        target (str): Path to the target/reference audio file.
+        output (str): Path to save the reconstructed audio file.
+        diffusion_steps (int): Number of diffusion steps for processing.
+        length_adjust (float): Adjustment factor for audio length.
+        inference_cfg_rate (float): CFG rate for inference.
+        f0_condition (bool): Whether to use F0 conditioning.
+        auto_f0_adjust (bool): Whether to auto-adjust F0.
+        semi_tone_shift (int): Number of semitones to shift.
+        checkpoint_path (str): Path to the checkpoint file.
+        config_path (str): Path to the config file.
+        fp16 (bool): Whether to use FP16 precision.
+        in_cache_dir: where models will be downloaded
+        in_output_filename: custom filename to be used
+    """
+    model, semantic_fn, f0_fn, vocoder_fn, campplus_model, mel_fn, mel_fn_args = load_models(f0_condition=in_f0_condition, 
+                                                                                             checkpoint_path=in_checkpoint_path, 
+                                                                                             config_path=in_config_path, 
+                                                                                             infp16=in_fp16, 
+                                                                                             cache_dir=in_cache_dir)
+    
 
-    source = args.source
-    target_name = args.target
-    diffusion_steps = args.diffusion_steps
-    length_adjust = args.length_adjust
-    inference_cfg_rate = args.inference_cfg_rate
+    sr = mel_fn_args['sampling_rate']
+    f0_condition = in_f0_condition
+    auto_f0_adjust = in_auto_f0_adjust
+    pitch_shift = in_semi_tone_shift
+
+    source = in_source
+    target_name = in_target
+    diffusion_steps = in_diffusion_steps
+    length_adjust = in_length_adjust
+    inference_cfg_rate = in_inference_cfg_rate
     source_audio = librosa.load(source, sr=sr)[0]
     ref_audio = librosa.load(target_name, sr=sr)[0]
 
@@ -390,10 +431,13 @@ def main(args):
     time_vc_end = time.time()
     print(f"RTF: {(time_vc_end - time_vc_start) / vc_wave.size(-1) * sr}")
 
-    source_name = source.split("/")[-1].split(".")[0]
-    target_name = target_name.split("/")[-1].split(".")[0]
-    os.makedirs(args.output, exist_ok=True)
-    torchaudio.save(os.path.join(args.output, f"vc_{source_name}_{target_name}_{length_adjust}_{diffusion_steps}_{inference_cfg_rate}.wav"), vc_wave.cpu(), sr)
+    os.makedirs(in_output, exist_ok=True)
+    if in_output_filename is None:
+        source_name = source.split("/")[-1].split(".")[0]
+        target_name = target_name.split("/")[-1].split(".")[0]
+        in_output_filename=os.path.join(in_output, f"vc_{source_name}_{target_name}_{length_adjust}_{diffusion_steps}_{inference_cfg_rate}.wav")        
+    
+    torchaudio.save(in_output_filename, vc_wave.cpu(), sr)
 
 
 if __name__ == "__main__":
@@ -411,4 +455,21 @@ if __name__ == "__main__":
     parser.add_argument("--config-path", type=str, help="Path to the config file", default=None)
     parser.add_argument("--fp16", type=str2bool, default=True)
     args = parser.parse_args()
-    main(args)
+    
+    
+    #local_cache_dir="./cachedir"
+
+    main(in_source=args.source, 
+         in_target=args.target,
+         in_output=args.output, 
+         in_diffusion_steps=args.diffusion_steps,
+         in_length_adjust=args.length_adjust,
+         in_inference_cfg_rate=args.inference_cfg_rate,
+         in_f0_condition=args.f0_condition,
+         in_auto_f0_adjust=args.auto_f0_adjust,
+         in_semi_tone_shift=args.semi_tone_shift,
+         in_checkpoint_path=args.checkpoint_path,
+         in_config_path=args.config_path,
+         in_fp16=args.fp16,   
+         in_cache_dir=local_cache_dir      
+         )
