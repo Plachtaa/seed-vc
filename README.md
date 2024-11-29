@@ -112,6 +112,7 @@ Fine-tuning on custom data allow the model to clone someone's voice more accurat
 A Colab Tutorial is here for you to follow: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R1BJTqMsTXZzYAVx3j1BiemFXog9pbQG?usp=sharing)
 1. Prepare your own dataset. It has to satisfy the following:
     - File structure does not matter
+    - Each audio file should range from 1 to 30 seconds, otherwise will be ignored
     - All audio files should be in on of the following formats: `.wav` `.flac` `.mp3` `.m4a` `.opus` `.ogg`
     - Speaker label is not required, but make sure that each speaker has at least 1 utterance
     - Of course, the more data you have, the better the model will perform
@@ -143,7 +144,9 @@ where:
 - `save-every` is the number of steps to save the model checkpoint
 - `num-workers` is the number of workers for data loading, set to 0 for Windows    
 
-4. After training, you can use the trained model for inference by specifying the path to the checkpoint and config file.
+4. If training accidentially stops, you can resume training by running the same command again, the training will continue from the last checkpoint. (Make sure `run-name` and `config` arguments are the same so that latest checkpoint can be found)
+
+5. After training, you can use the trained model for inference by specifying the path to the checkpoint and config file.
     - They should be under `./runs/<run-name>/`, with the checkpoint named `ft_model.pth` and config file with the same name as the training config file.
     - You still have to specify a reference audio file of the speaker you'd like to use during inference, similar to zero-shot usage.
 

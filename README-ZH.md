@@ -103,6 +103,7 @@ python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-conf
 这里是一个简单的Colab示例以供参考: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R1BJTqMsTXZzYAVx3j1BiemFXog9pbQG?usp=sharing)
 1. 准备您的数据集。必须满足以下要求：
     - 文件结构不重要
+    - 每条音频长度必须在1-30秒之间，否则会被自动忽略
     - 所有音频文件必须是以下格式之一：`.wav` `.flac` `.mp3` `.m4a` `.opus` `.ogg`
     - 不需要说话人标签，但请确保每位说话人至少有 1 条语音
     - 当然，数据越多，模型的表现就越好
@@ -134,7 +135,9 @@ where:
 - `save-every` 保存模型检查点的步数
 - `num-workers` 数据加载的工作线程数量，建议 Windows 上设置为 0
 
-4. 训练完成后，您可以通过指定检查点和配置文件的路径来进行推理。
+4. 如果需要从上次停止的地方继续训练，只需运行同样的命令即可。通过传入相同的 `run-name` 和 `config` 参数，程序将能够找到上次训练的检查点和日志。
+
+5. 训练完成后，您可以通过指定检查点和配置文件的路径来进行推理。
     - 它们应位于 `./runs/<run-name>/` 下，检查点命名为 `ft_model.pth`，配置文件名称与训练配置文件相同。
     - 在推理时，您仍需指定要使用的说话人的参考音频文件，类似于零样本推理。
 
