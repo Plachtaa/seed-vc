@@ -390,8 +390,8 @@ def main(args):
     time_vc_end = time.time()
     print(f"RTF: {(time_vc_end - time_vc_start) / vc_wave.size(-1) * sr}")
 
-    source_name = source.split("/")[-1].split(".")[0]
-    target_name = target_name.split("/")[-1].split(".")[0]
+    source_name = os.path.basename(source).split(".")[0]
+    target_name = os.path.basename(target_name).split(".")[0]
     os.makedirs(args.output, exist_ok=True)
     torchaudio.save(os.path.join(args.output, f"vc_{source_name}_{target_name}_{length_adjust}_{diffusion_steps}_{inference_cfg_rate}.wav"), vc_wave.cpu(), sr)
 
