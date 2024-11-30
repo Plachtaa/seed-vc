@@ -295,7 +295,7 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
                                                        mel2, style2, None, diffusion_steps,
                                                        inference_cfg_rate=inference_cfg_rate)
             vc_target = vc_target[:, :, mel2.size(-1):]
-            vc_wave = vocoder_fn(vc_target)[0]
+        vc_wave = vocoder_fn(vc_target.float())[0]
         if vc_wave.ndim == 1:
             vc_wave = vc_wave.unsqueeze(0)
         if processed_frames == 0:
