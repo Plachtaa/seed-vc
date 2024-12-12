@@ -303,12 +303,6 @@ class Trainer:
                                sample_frequency=16000)
             feat = feat - feat.mean(dim=0, keepdim=True)
             feat_list.append(feat)
-        max_feat_len = max([feat.size(0) for feat in feat_list])
-        feat_lens = torch.tensor([feat.size(0) for feat in feat_list], dtype=torch.int32).to(self.device) // 2
-        feat_list = [
-            torch.nn.functional.pad(feat, (0, 0, 0, max_feat_len - feat.size(0)), value=float(feat.min().item()))
-            for feat in feat_list
-        ]
         y_list = []
         with torch.no_grad():
             for feat in feat_list:
