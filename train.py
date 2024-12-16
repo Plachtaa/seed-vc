@@ -14,6 +14,7 @@ from modules.commons import recursive_munch, build_model, load_checkpoint
 from optimizers import build_optimizer
 from data.ft_dataset import build_ft_dataloader
 from hf_utils import load_custom_model_from_hf
+import shutil
 
 
 
@@ -36,7 +37,7 @@ class Trainer:
         self.log_dir = os.path.join(config['log_dir'], run_name)
         os.makedirs(self.log_dir, exist_ok=True)
         # copy config file to log dir
-        os.system(f'cp {config_path} {self.log_dir}')
+        shutil.copyfile(config_path, os.path.join(self.log_dir, os.path.basename(config_path)))
         batch_size = config.get('batch_size', 10) if batch_size == 0 else batch_size
         self.max_steps = steps
 
