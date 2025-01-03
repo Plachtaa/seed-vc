@@ -18,7 +18,6 @@ import shutil
 
 
 
-
 class Trainer:
     def __init__(self,
                  config_path,
@@ -385,6 +384,7 @@ def main(args):
         max_epochs=args.max_epochs,
         save_interval=args.save_every,
         num_workers=args.num_workers,
+        device=args.device
     )
     trainer.train()
 
@@ -399,5 +399,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-epochs', type=int, default=1000)
     parser.add_argument('--save-every', type=int, default=500)
     parser.add_argument('--num-workers', type=int, default=0)
+    parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
     args = parser.parse_args()
+    args.device = f"cuda:{args.gpu}" if args.gpu else "cuda:0" 
     main(args)
