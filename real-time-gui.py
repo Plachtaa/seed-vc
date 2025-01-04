@@ -30,7 +30,7 @@ import sys
 import torch
 from modules.commons import str2bool
 # Load model and configuration
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = None
 
 flag_vc = False
 
@@ -328,7 +328,7 @@ def printt(strr, *args):
 
 class Config:
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
 
 
 if __name__ == "__main__":
@@ -1137,5 +1137,8 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint-path", type=str, default=None, help="Path to the model checkpoint")
     parser.add_argument("--config-path", type=str, default=None, help="Path to the vocoder checkpoint")
     parser.add_argument("--fp16", type=str2bool, nargs="?", const=True, help="Whether to use fp16", default=True)
+    parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
     args = parser.parse_args()
+    cuda_target = f"cuda:{args.gpu}" if args.gpu else "cuda" 
+    device = torch.device(cuda_target if torch.cuda.is_available() else "cpu")
     gui = GUI(args)
