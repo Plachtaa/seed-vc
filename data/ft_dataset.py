@@ -22,6 +22,8 @@ class FT_Dataset(torch.utils.data.Dataset):
         spect_params,
         sr=22050,
         batch_size=1,
+        max_audio_sample: float = 1,
+        min_audio_sample: float = -1,
     ):
         self.data_path = data_path
         self.data = []
@@ -45,6 +47,11 @@ class FT_Dataset(torch.utils.data.Dataset):
         assert len(self.data) != 0
         while len(self.data) < batch_size:
             self.data += self.data
+        assert max_audio_sample is not None
+        assert min_audio_sample is not None
+        assert min_audio_sample < max_audio_sample
+        self.max_audio_sample = max_audio_sample
+        self.min_audio_sample = min_audio_sample
 
     def __len__(self):
         return len(self.data)
@@ -64,6 +71,7 @@ class FT_Dataset(torch.utils.data.Dataset):
             speech = librosa.resample(speech, orig_sr, self.sr)
 
         wave = torch.from_numpy(speech).float().unsqueeze(0)
+        wave = torch.clamp(wave, self.min_audio_sample, self.max_audio_sample)
         mel = to_mel_fn(wave, self.mel_fn_args).squeeze(0)
 
         return wave.squeeze(0), mel
