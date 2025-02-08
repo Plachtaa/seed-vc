@@ -1,0 +1,13 @@
+python inference.py \
+    --source examples/reference/s1p2.wav \
+    --target examples/vo_card_yaeMiko_invite_easy_03.wav \
+    --output examples \
+    --diffusion-steps 10 \
+    --length-adjust 1.0 \
+    --inference-cfg-rate 0.7 \
+    --f0-condition False \
+    --auto-f0-adjust False \
+    --semi-tone-shift 0 \
+    --checkpoint runs/real_time_bachong/ft_model.pth \
+    --config runs/real_time_bachong/config_dit_mel_seed_uvit_xlsr_tiny.yml \
+    --fp16 True

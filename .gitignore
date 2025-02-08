@@ -21,3 +21,6 @@ reconstructed/
 .python-version
 ruff.log
 /configs/inuse/
+modeldata
+dataset
+runs
