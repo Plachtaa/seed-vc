@@ -1,56 +1,98 @@
 @echo off
-echo Setting up Seed-VC environment...
+setlocal EnableDelayedExpansion
+chcp 65001 >nul
+:: Get script directory
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%"
 
-:: 检查NVIDIA驱动
+echo Setting up environment...
+
+:: Check NVIDIA GPU driver
 echo Checking NVIDIA GPU driver...
-nvidia-smi >nul 2>&1
-if %errorlevel% neq 0 (
+nvidia-smi >nul 2>nul
+if !errorlevel! neq 0 (
+    echo.
     echo Warning: NVIDIA GPU not found or driver not installed
     echo For best performance, please install NVIDIA driver from:
     echo https://www.nvidia.com/download/index.aspx
     echo.
     echo Press any key to continue anyway...
-    pause >nul
+    pause
 ) else (
-    :: 检查驱动版本
-    for /f "tokens=1" %%i in ('nvidia-smi --query-gpu^=driver_version --format^=csv,noheader') do set "driver_version=%%i"
-    echo Current NVIDIA driver version: %driver_version%
-    
-    :: 比较版本号
-    if %driver_version% LSS 525.60.13 (
-        echo Warning: Your NVIDIA driver version is below 525.60.13
-        echo For optimal performance with PyTorch 2.4.0, please update your driver
-        echo Visit: https://www.nvidia.com/download/index.aspx
-        echo.
-        echo Press any key to continue anyway...
-        pause >nul
-    ) else (
-        echo NVIDIA driver version is compatible
+    :: Check driver version
+    for /f "tokens=1" %%i in ('nvidia-smi --query-gpu^=driver_version --format^=csv^,noheader 2^>nul') do set "driver_version=%%i"
+    if defined driver_version (
+        echo NVIDIA GPU found, driver version: !driver_version!
+        echo Driver check passed
         timeout /t 2 >nul
+    ) else (
+        echo Error: Could not determine driver version
+        pause
     )
 )
 
-:: 创建虚拟环境
+
+:: Create virtual environment
 if not exist "venv" (
     echo Creating virtual environment...
     python -m venv venv
+    if %errorlevel% neq 0 (
+        echo Failed to create virtual environment
+        pause
+        exit /b 1
+    )
     
-    :: 激活环境并安装依赖
+    :: Activate environment and install dependencies
     call venv\Scripts\activate.bat
+    if %errorlevel% neq 0 (
+        echo Failed to activate virtual environment
+        pause
+        exit /b 1
+    )
     
-    :: 升级pip
+    :: Upgrade pip
     python -m pip install --upgrade pip
+    if %errorlevel% neq 0 (
+        echo Failed to upgrade pip
+        pause
+        exit /b 1
+    )
     
-    :: 设置pip镜像源
+    :: Set pip mirror
     pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
     
     echo Installing requirements...
     pip install -r requirements.txt
+    if %errorlevel% neq 0 (
+        echo Failed to install requirements
+        pause
+        exit /b 1
+    )
     
     echo Setup complete!
 ) else (
     call venv\Scripts\activate.bat
+    if %errorlevel% neq 0 (
+        echo Failed to activate virtual environment
+        pause
+        exit /b 1
+    )
 )
 
-:: 启动GUI
-python launcher.py 
+:: Launch GUI and catch errors
+python launcher.py
+if %errorlevel% neq 0 (
+    echo.
+    echo Error occurred while running launcher.py
+    echo Press any key to exit...
+    pause >nul
+    exit /b 1
+)
+
+:: Pause if any errors occurred
+if %errorlevel% neq 0 (
+    echo.
+    echo Script ended with errors
+    pause
+    exit /b 1
+) 
