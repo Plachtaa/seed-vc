@@ -31,6 +31,7 @@ import os
 import sys
 import torch
 from modules.commons import str2bool
+from pathlib import Path
 # Load model and configuration
 device = None
 
@@ -183,11 +184,15 @@ def custom_infer(model_set,
 def load_models(args):
     global fp16
     fp16 = args.fp16
+    ckpt_root = Path(__file__).parent / "checkpoints"
     print(f"Using fp16: {fp16}")
     if args.checkpoint_path is None or args.checkpoint_path == "":
-        dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                                         "DiT_uvit_tat_xlsr_ema.pth",
-                                                                         "config_dit_mel_seed_uvit_xlsr_tiny.yml")
+        dit_checkpoint_path = ckpt_root / "seed_vc" / "real_time_model" / "DiT_uvit_tat_xlsr_ema.pth"
+        dit_config_path = ckpt_root / "seed_vc" / "real_time_model" / "config_dit_mel_seed_uvit_xlsr_tiny.yml"
+        if not dit_checkpoint_path.exists() or not dit_config_path.exists():
+            dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+                                                                             "DiT_uvit_tat_xlsr_ema.pth",
+                                                                             "config_dit_mel_seed_uvit_xlsr_tiny.yml")
     else:
         dit_checkpoint_path = args.checkpoint_path
         dit_config_path = args.config_path
@@ -214,10 +219,11 @@ def load_models(args):
 
     # Load additional modules
     from modules.campplus.DTDNN import CAMPPlus
-
-    campplus_ckpt_path = load_custom_model_from_hf(
-        "funasr/campplus", "campplus_cn_common.bin", config_filename=None
-    )
+    campplus_ckpt_path = ckpt_root / "campplus" / "campplus_cn_common.bin"
+    if not campplus_ckpt_path.exists():
+        campplus_ckpt_path = load_custom_model_from_hf(
+            "funasr/campplus", "campplus_cn_common.bin", config_filename=None
+        )
     campplus_model = CAMPPlus(feat_dim=80, embedding_size=192)
     campplus_model.load_state_dict(torch.load(campplus_ckpt_path, map_location="cpu"))
     campplus_model.eval()
@@ -238,8 +244,7 @@ def load_models(args):
         from modules.hifigan.f0_predictor import ConvRNNF0Predictor
         hift_config = yaml.safe_load(open('configs/hifigan.yml', 'r'))
         hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
-        hift_path = load_custom_model_from_hf("FunAudioLLM/CosyVoice-300M", 'hift.pt', None)
-        hift_gen.load_state_dict(torch.load(hift_path, map_location='cpu'))
+        hift_gen.load_state_dict(torch.load(str(ckpt_root / "cosy_hifigan" / "hift.pt"), map_location='cpu'))
         hift_gen.eval()
         hift_gen.to(device)
         vocoder_fn = hift_gen
@@ -436,7 +441,7 @@ if __name__ == "__main__":
             self.output_devices_indices = None
             self.stream = None
             self.model_set = load_models(args)
-            self.vad_model = AutoModel(model="fsmn_vad", model_revision="v2.0.4")
+            self.vad_model = AutoModel(model="checkpoints/speech_fsmn_vad_zh-cn-16k-common-pytorch", model_revision="v2.0.4")
             self.update_devices()
             self.launcher()
 
@@ -1176,14 +1181,12 @@ if __name__ == "__main__":
                     self.gui_config.pitch_shift,
                 )
                 if self.resampler2 is not None:
-                    print(f"经过第二个重采样器")
                     infer_wav = self.resampler2(infer_wav)
                 end_event.record()
                 torch.cuda.synchronize()  # Wait for the events to be recorded!
                 elapsed_time_ms = start_event.elapsed_time(end_event)
                 print(f"Time taken for VC: {elapsed_time_ms}ms")
                 if not self.vad_speech_detected:
-                    print("没有检测到语音")
                     infer_wav = torch.zeros_like(self.input_wav[self.extra_frame :])
             elif self.gui_config.I_noise_reduce:
                 infer_wav = self.input_wav_denoise[self.extra_frame :].clone()
