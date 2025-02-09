@@ -2,6 +2,7 @@
 torch==2.4.0
 torchvision==0.19.0
 torchaudio==2.4.0
+PyQt5==5.15.9
 scipy==1.13.1
 librosa==0.10.2
 huggingface-hub==0.23.4
@@ -9,6 +10,7 @@ munch==4.0.0
 einops==0.8.0
 descript-audio-codec==1.0.0
 gradio==4.44.0
+typing==3.7.4.3
 pydub==0.25.1
 resemblyzer
 jiwer==3.0.3
@@ -18,3 +20,7 @@ soundfile==0.12.1
 sounddevice==0.5.0
 modelscope==1.18.1
 funasr==1.1.5
+tqdm
+pyyaml
+python-dotenv
+numpy==1.26.4

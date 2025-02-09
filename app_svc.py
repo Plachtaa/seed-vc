@@ -10,6 +10,7 @@ from hf_utils import load_custom_model_from_hf
 import numpy as np
 from pydub import AudioSegment
 import argparse
+from pathlib import Path
 # Load model and configuration
 
 fp16 = False
@@ -17,13 +18,18 @@ device = None
 def load_models(args):
     global sr, hop_length, fp16
     fp16 = args.fp16
+    ckpt_root = Path(__file__).parent / "checkpoints"
     print(f"Using device: {device}")
     print(f"Using fp16: {fp16}")
     # f0 conditioned model
     if args.checkpoint_path is None or args.checkpoint_path == "":
-        dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                                         "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth",
-                                                                         "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")
+        # 检测模型
+        dit_checkpoint_path = ckpt_root / "seed_vc" / "svc_model" / "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth"
+        dit_config_path = ckpt_root / "seed_vc" / "svc_model" / "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml"
+        if not dit_checkpoint_path.exists() or not dit_config_path.exists():
+            dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+                                                                            "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth",
+                                                                            "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")
     else:
         print(f"Using custom checkpoint: {args.checkpoint_path}")
         dit_checkpoint_path = args.checkpoint_path
@@ -52,9 +58,11 @@ def load_models(args):
     # Load additional modules
     from modules.campplus.DTDNN import CAMPPlus
 
-    campplus_ckpt_path = load_custom_model_from_hf(
-        "funasr/campplus", "campplus_cn_common.bin", config_filename=None
-    )
+    campplus_ckpt_path = ckpt_root / "campplus" / "campplus_cn_common.bin"
+    if not campplus_ckpt_path.exists():
+        campplus_ckpt_path = load_custom_model_from_hf(
+            "funasr/campplus", "campplus_cn_common.bin", config_filename=None
+        )
     campplus_model = CAMPPlus(feat_dim=80, embedding_size=192)
     campplus_model.load_state_dict(torch.load(campplus_ckpt_path, map_location="cpu"))
     campplus_model.eval()
@@ -75,8 +83,7 @@ def load_models(args):
         from modules.hifigan.f0_predictor import ConvRNNF0Predictor
         hift_config = yaml.safe_load(open('configs/hifigan.yml', 'r'))
         hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
-        hift_path = load_custom_model_from_hf("FunAudioLLM/CosyVoice-300M", 'hift.pt', None)
-        hift_gen.load_state_dict(torch.load(hift_path, map_location='cpu'))
+        hift_gen.load_state_dict(torch.load(str(ckpt_root / "cosy_hifigan" / "hift.pt"), map_location='cpu'))
         hift_gen.eval()
         hift_gen.to(device)
         vocoder_fn = hift_gen
@@ -198,9 +205,10 @@ def load_models(args):
     to_mel = lambda x: mel_spectrogram(x, **mel_fn_args)
     # f0 extractor
     from modules.rmvpe import RMVPE
-
-    model_path = load_custom_model_from_hf("lj1995/VoiceConversionWebUI", "rmvpe.pt", None)
-    rmvpe = RMVPE(model_path, is_half=False, device=device)
+    rmvpe_path = ckpt_root / "rmvpe" / "rmvpe.pt"
+    if not rmvpe_path.exists():
+        rmvpe_path = load_custom_model_from_hf("lj1995/VoiceConversionWebUI", "rmvpe.pt", None)
+    rmvpe = RMVPE(rmvpe_path, is_half=False, device=device)
     f0_fn = rmvpe.infer_from_audio
 
     return (
