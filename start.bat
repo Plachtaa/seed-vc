@@ -50,6 +50,14 @@ if %errorlevel% neq 0 (
 :: Check if virtual environment exists
 if not exist "venv" (
     call setup.bat
+    if %errorlevel% neq 0 (
+        :: If setup failed, remove the venv directory if it exists
+        if exist "venv" (
+            echo Setup failed. Cleaning up virtual environment...
+            rmdir /s /q "venv"
+        )
+        exit /b 1
+    )
 ) else (
     :: Activate virtual environment
     call venv\Scripts\activate.bat

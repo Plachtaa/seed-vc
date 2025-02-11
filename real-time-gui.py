@@ -1304,8 +1304,8 @@ if __name__ == "__main__":
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint-path", type=str, default='runs/real_time_bachong/ft_model.pth', help="Path to the model checkpoint")
-    parser.add_argument("--config-path", type=str, default='runs/real_time_bachong/config_dit_mel_seed_uvit_xlsr_tiny.yml', help="Path to the vocoder checkpoint")
+    parser.add_argument("--checkpoint-path", type=str, default='', help="Path to the model checkpoint")
+    parser.add_argument("--config-path", type=str, default='', help="Path to the vocoder checkpoint")
     parser.add_argument("--fp16", type=str2bool, nargs="?", const=True, help="Whether to use fp16", default=True)
     parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
     args = parser.parse_args()
