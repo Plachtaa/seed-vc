@@ -1,8 +1,10 @@
 import os
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'  # 添加这行
 import sys
 from dotenv import load_dotenv
 import shutil
-
+from funasr import AutoModel
+import soundfile as sf
 load_dotenv()
 
 os.environ["OMP_NUM_THREADS"] = "4"
@@ -29,6 +31,7 @@ import os
 import sys
 import torch
 from modules.commons import str2bool
+from pathlib import Path
 # Load model and configuration
 device = None
 
@@ -40,79 +43,122 @@ reference_wav_name = ""
 prompt_len = 3  # in seconds
 ce_dit_difference = 2.0  # 2 seconds
 fp16 = False
-@torch.no_grad()
+@torch.no_grad()  # 推理时不需要计算梯度
 def custom_infer(model_set,
-                 reference_wav,
-                 new_reference_wav_name,
-                 input_wav_res,
-                 block_frame_16k,
-                 skip_head,
-                 skip_tail,
-                 return_length,
-                 diffusion_steps,
-                 inference_cfg_rate,
-                 max_prompt_length,
-                 cd_difference=2.0,
+                 reference_wav,        # 参考音频数据
+                 new_reference_wav_name,  # 参考音频文件名
+                 input_wav_res,        # 输入的音频数据(16kHz采样率)
+                 block_frame_16k,      # 16kHz采样率下的帧长
+                 skip_head,            # 要跳过的头部帧数
+                 skip_tail,            # 要跳过的尾部帧数
+                 return_length,        # 要返回的音频长度
+                 diffusion_steps,      # 扩散模型的推理步数
+                 inference_cfg_rate,   # 推理时的CFG rate
+                 max_prompt_length,    # 最大提示音频长度(秒)
+                 cd_difference=2.0,    # 内容编码器和DiT的时间差异
+                 pitch_shift=0,        # 添加音高调节参数
                  ):
+    # 使用全局变量来缓存计算结果，避免重复计算
     global prompt_condition, mel2, style2
     global reference_wav_name
     global prompt_len
     global ce_dit_difference
+
+    # 解包模型集合
     (
-        model,
-        semantic_fn,
-        vocoder_fn,
-        campplus_model,
-        to_mel,
-        mel_fn_args,
+        model,              # 主模型
+        semantic_fn,        # 语义特征提取函数
+        vocoder_fn,         # 声码器
+        campplus_model,     # 说话人风格编码器
+        to_mel,            # 梅尔频谱图转换函数
+        mel_fn_args,       # 梅尔频谱图参数
     ) = model_set
-    sr = mel_fn_args["sampling_rate"]
-    hop_length = mel_fn_args["hop_size"]
+
+    sr = mel_fn_args["sampling_rate"]        # 采样率
+    hop_length = mel_fn_args["hop_size"]     # 帧移
+
+    # 更新时间差异设置
     if ce_dit_difference != cd_difference:
         ce_dit_difference = cd_difference
         print(f"Setting ce_dit_difference to {cd_difference} seconds.")
+
+    # 只有在必要时才重新计算参考音频的特征
     if prompt_condition is None or reference_wav_name != new_reference_wav_name or prompt_len != max_prompt_length:
         prompt_len = max_prompt_length
         print(f"Setting max prompt length to {max_prompt_length} seconds.")
+        # 截取指定长度的参考音频
         reference_wav = reference_wav[:int(sr * prompt_len)]
         reference_wav_tensor = torch.from_numpy(reference_wav).to(device)
 
+        # 将参考音频重采样到16kHz
         ori_waves_16k = torchaudio.functional.resample(reference_wav_tensor, sr, 16000)
+        # 提取语义特征
         S_ori = semantic_fn(ori_waves_16k.unsqueeze(0))
+        # 计算声学特征
         feat2 = torchaudio.compliance.kaldi.fbank(
             ori_waves_16k.unsqueeze(0), num_mel_bins=80, dither=0, sample_frequency=16000
         )
-        feat2 = feat2 - feat2.mean(dim=0, keepdim=True)
+        feat2 = feat2 - feat2.mean(dim=0, keepdim=True)  # 均值归一化
+        # 提取说话人风格特征
         style2 = campplus_model(feat2.unsqueeze(0))
 
+        # 计算梅尔频谱图
         mel2 = to_mel(reference_wav_tensor.unsqueeze(0))
         target2_lengths = torch.LongTensor([mel2.size(2)]).to(mel2.device)
+        # 通过长度调节器处理特征
         prompt_condition = model.length_regulator(
             S_ori, ylens=target2_lengths, n_quantizers=3, f0=None
         )[0]
 
         reference_wav_name = new_reference_wav_name
 
+    # 在处理输入音频之前进行音高调节
+    if pitch_shift != 0:
+        # 使用librosa进行音高调节
+        input_wav_res_np = input_wav_res.cpu().numpy()
+        input_wav_res_shifted = librosa.effects.pitch_shift(
+            y=input_wav_res_np,
+            sr=16000,  # 固定使用16kHz采样率
+            n_steps=pitch_shift,
+            bins_per_octave=12
+        )
+        input_wav_res = torch.from_numpy(input_wav_res_shifted).to(device)
+    
+    # 处理输入音频
     converted_waves_16k = input_wav_res
+    
+    # 计时开始
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)
     torch.cuda.synchronize()
     start_event.record()
+    
+    # 提取输入音频的语义特征
     S_alt = semantic_fn(converted_waves_16k.unsqueeze(0))
+    
+    # 计时结束
     end_event.record()
-    torch.cuda.synchronize()  # Wait for the events to be recorded!
+    torch.cuda.synchronize()
     elapsed_time_ms = start_event.elapsed_time(end_event)
     print(f"Time taken for semantic_fn: {elapsed_time_ms}ms")
 
+    # 处理时间差异
     ce_dit_frame_difference = int(ce_dit_difference * 50)
-    S_alt = S_alt[:, ce_dit_frame_difference:]
+    S_alt = S_alt[:, ce_dit_frame_difference:]  # 裁剪特征
+    # 计算目标长度
     target_lengths = torch.LongTensor([(skip_head + return_length + skip_tail - ce_dit_frame_difference) / 50 * sr // hop_length]).to(S_alt.device)
     print(f"target_lengths: {target_lengths}")
+    
+    # 通过长度调节器处理特征
     cond = model.length_regulator(
         S_alt, ylens=target_lengths , n_quantizers=3, f0=None
     )[0]
+    # 拼接提示特征和输入特征
     cat_condition = torch.cat([prompt_condition, cond], dim=1)
+
+    # 使用自动混合精度进行推理
     with torch.autocast(device_type=device.type, dtype=torch.float16 if fp16 else torch.float32):
+        # 通过扩散模型生成目标梅尔频谱图
         vc_target = model.cfm.inference(
             cat_condition,
             torch.LongTensor([cat_condition.size(1)]).to(mel2.device),
@@ -122,23 +168,31 @@ def custom_infer(model_set,
             n_timesteps=diffusion_steps,
             inference_cfg_rate=inference_cfg_rate,
         )
+        # 只保留非提示部分
         vc_target = vc_target[:, :, mel2.size(-1) :]
         print(f"vc_target.shape: {vc_target.shape}")
+        # 通过声码器生成波形
         vc_wave = vocoder_fn(vc_target).squeeze()
+
+    # 计算输出长度和尾部长度
     output_len = return_length * sr // 50
     tail_len = skip_tail * sr // 50
+    # 裁剪并返回最终音频
     output = vc_wave[-output_len - tail_len: -tail_len]
-
     return output
 
 def load_models(args):
     global fp16
     fp16 = args.fp16
+    ckpt_root = Path(__file__).parent / "checkpoints"
     print(f"Using fp16: {fp16}")
     if args.checkpoint_path is None or args.checkpoint_path == "":
-        dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                                         "DiT_uvit_tat_xlsr_ema.pth",
-                                                                         "config_dit_mel_seed_uvit_xlsr_tiny.yml")
+        dit_checkpoint_path = ckpt_root / "seed_vc" / "real_time_model" / "DiT_uvit_tat_xlsr_ema.pth"
+        dit_config_path = ckpt_root / "seed_vc" / "real_time_model" / "config_dit_mel_seed_uvit_xlsr_tiny.yml"
+        if not dit_checkpoint_path.exists() or not dit_config_path.exists():
+            dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+                                                                             "DiT_uvit_tat_xlsr_ema.pth",
+                                                                             "config_dit_mel_seed_uvit_xlsr_tiny.yml")
     else:
         dit_checkpoint_path = args.checkpoint_path
         dit_config_path = args.config_path
@@ -165,10 +219,11 @@ def load_models(args):
 
     # Load additional modules
     from modules.campplus.DTDNN import CAMPPlus
-
-    campplus_ckpt_path = load_custom_model_from_hf(
-        "funasr/campplus", "campplus_cn_common.bin", config_filename=None
-    )
+    campplus_ckpt_path = ckpt_root / "campplus" / "campplus_cn_common.bin"
+    if not campplus_ckpt_path.exists():
+        campplus_ckpt_path = load_custom_model_from_hf(
+            "funasr/campplus", "campplus_cn_common.bin", config_filename=None
+        )
     campplus_model = CAMPPlus(feat_dim=80, embedding_size=192)
     campplus_model.load_state_dict(torch.load(campplus_ckpt_path, map_location="cpu"))
     campplus_model.eval()
@@ -189,8 +244,7 @@ def load_models(args):
         from modules.hifigan.f0_predictor import ConvRNNF0Predictor
         hift_config = yaml.safe_load(open('configs/hifigan.yml', 'r'))
         hift_gen = HiFTGenerator(**hift_config['hift'], f0_predictor=ConvRNNF0Predictor(**hift_config['f0_predictor']))
-        hift_path = load_custom_model_from_hf("FunAudioLLM/CosyVoice-300M", 'hift.pt', None)
-        hift_gen.load_state_dict(torch.load(hift_path, map_location='cpu'))
+        hift_gen.load_state_dict(torch.load(str(ckpt_root / "cosy_hifigan" / "hift.pt"), map_location='cpu'))
         hift_gen.eval()
         hift_gen.to(device)
         vocoder_fn = hift_gen
@@ -371,6 +425,7 @@ if __name__ == "__main__":
             self.wasapi_exclusive: bool = False
             self.sg_input_device: str = ""
             self.sg_output_device: str = ""
+            self.pitch_shift: int = 0  # 添加音高调节参数，0表示不调节
 
 
     class GUI:
@@ -386,8 +441,7 @@ if __name__ == "__main__":
             self.output_devices_indices = None
             self.stream = None
             self.model_set = load_models(args)
-            from funasr import AutoModel
-            self.vad_model = AutoModel(model="fsmn-vad", model_revision="v2.0.4")
+            self.vad_model = AutoModel(model="checkpoints/speech_fsmn_vad_zh-cn-16k-common-pytorch", model_revision="v2.0.4")
             self.update_devices()
             self.launcher()
 
@@ -537,17 +591,17 @@ if __name__ == "__main__":
                 [
                     sg.Frame(
                         layout=[
-                            # [
-                            #     sg.Text("Activation threshold"),
-                            #     sg.Slider(
-                            #         range=(-60, 0),
-                            #         key="threhold",
-                            #         resolution=1,
-                            #         orientation="h",
-                            #         default_value=data.get("threhold", -60),
-                            #         enable_events=True,
-                            #     ),
-                            # ],
+                            [
+                                sg.Text("Activation threshold"),
+                                sg.Slider(
+                                    range=(-60, 0),
+                                    key="threhold",
+                                    resolution=1,
+                                    orientation="h",
+                                    default_value=data.get("threhold", -40),
+                                    enable_events=True,
+                                ),
+                            ],
                             [
                                 sg.Text("Diffusion steps"),
                                 sg.Slider(
@@ -578,6 +632,17 @@ if __name__ == "__main__":
                                     resolution=0.5,
                                     orientation="h",
                                     default_value=data.get("max_prompt_length", 3.0),
+                                    enable_events=True,
+                                ),
+                            ],
+                            [
+                                sg.Text("Pitch shift (semitones)"),
+                                sg.Slider(
+                                    range=(-12, 12),
+                                    key="pitch_shift",
+                                    resolution=1,
+                                    orientation="h",
+                                    default_value=data.get("pitch_shift", 0),
                                     enable_events=True,
                                 ),
                             ],
@@ -717,7 +782,7 @@ if __name__ == "__main__":
                                     values["sr_device"],
                                 ].index(True)
                             ],
-                            # "threhold": values["threhold"],
+                            "threhold": values["threhold"],
                             "diffusion_steps": values["diffusion_steps"],
                             "inference_cfg_rate": values["inference_cfg_rate"],
                             "max_prompt_length": values["max_prompt_length"],
@@ -726,6 +791,7 @@ if __name__ == "__main__":
                             "extra_time_ce": values["extra_time_ce"],
                             "extra_time": values["extra_time"],
                             "extra_time_right": values["extra_time_right"],
+                            "pitch_shift": values["pitch_shift"],
                         }
                         with open("configs/inuse/config.json", "w") as j:
                             json.dump(settings, j)
@@ -742,8 +808,8 @@ if __name__ == "__main__":
                             int(np.round(self.delay_time * 1000))
                         )
                 # Parameter hot update
-                # if event == "threhold":
-                #     self.gui_config.threhold = values["threhold"]
+                if event == "threhold":
+                    self.gui_config.threhold = values["threhold"]
                 elif event == "diffusion_steps":
                     self.gui_config.diffusion_steps = values["diffusion_steps"]
                 elif event == "inference_cfg_rate":
@@ -753,6 +819,8 @@ if __name__ == "__main__":
                 elif event == "stop_vc" or event != "start_vc":
                     # Other parameters do not support hot update
                     self.stop_stream()
+                elif event == "pitch_shift":
+                    self.gui_config.pitch_shift = int(values["pitch_shift"])
 
         def set_values(self, values):
             if len(values["reference_audio_path"].strip()) == 0:
@@ -783,20 +851,32 @@ if __name__ == "__main__":
             self.gui_config.extra_time_ce = values["extra_time_ce"]
             self.gui_config.extra_time = values["extra_time"]
             self.gui_config.extra_time_right = values["extra_time_right"]
+            self.gui_config.pitch_shift = values["pitch_shift"]
             return True
 
         def start_vc(self):
+            # 清空 CUDA 缓存
             torch.cuda.empty_cache()
+            
+            # 加载参考音频
             self.reference_wav, _ = librosa.load(
                 self.gui_config.reference_audio_path, sr=self.model_set[-1]["sampling_rate"]
             )
+            
+            # 设置采样率 - 使用模型采样率或设备采样率
             self.gui_config.samplerate = (
                 self.model_set[-1]["sampling_rate"]
                 if self.gui_config.sr_type == "sr_model"
                 else self.get_device_samplerate()
             )
+            
+            # 获取音频通道数
             self.gui_config.channels = self.get_device_channels()
-            self.zc = self.gui_config.samplerate // 50  # 44100 // 100 = 441
+            
+            # 计算基本帧长度 - 采样率/50作为基本单位
+            self.zc = self.gui_config.samplerate // 50  # 例如44100 // 50 = 882
+            
+            # 计算音频块的帧数
             self.block_frame = (
                 int(
                     np.round(
@@ -807,7 +887,11 @@ if __name__ == "__main__":
                 )
                 * self.zc
             )
+            
+            # 计算16k采样率下的块帧数 16000 / 50 = 320
             self.block_frame_16k = 320 * self.block_frame // self.zc
+            
+            # 计算交叉淡入淡出的帧数
             self.crossfade_frame = (
                 int(
                     np.round(
@@ -818,8 +902,12 @@ if __name__ == "__main__":
                 )
                 * self.zc
             )
+            
+            # 设置SOLA算法的缓冲区大小
             self.sola_buffer_frame = min(self.crossfade_frame, 4 * self.zc)
             self.sola_search_frame = self.zc
+            
+            # 计算内容编码器额外上下文的帧数
             self.extra_frame = (
                 int(
                     np.round(
@@ -830,6 +918,8 @@ if __name__ == "__main__":
                 )
                 * self.zc
             )
+            
+            # 计算右侧额外上下文的帧数
             self.extra_frame_right = (
                     int(
                         np.round(
@@ -840,6 +930,8 @@ if __name__ == "__main__":
                     )
                     * self.zc
             )
+            
+            # 初始化输入音频缓冲区 2 * 44100 + 0.08 * 44100 + 0.01 * 44100 + 0.25 * 44100
             self.input_wav: torch.Tensor = torch.zeros(
                 self.extra_frame
                 + self.crossfade_frame
@@ -848,24 +940,44 @@ if __name__ == "__main__":
                 + self.extra_frame_right,
                 device=self.config.device,
                 dtype=torch.float32,
-            )  # 2 * 44100 + 0.08 * 44100 + 0.01 * 44100 + 0.25 * 44100
+            )
+            # 缓冲区大小
+            print(f"缓存区大小：{self.input_wav.shape[0]/self.gui_config.samplerate}秒")
+            
+            # 初始化去噪后的输入音频缓冲区
             self.input_wav_denoise: torch.Tensor = self.input_wav.clone()
+            
+            # 初始化重采样后的输入音频缓冲区(16kHz)
             self.input_wav_res: torch.Tensor = torch.zeros(
                 320 * self.input_wav.shape[0] // self.zc,
                 device=self.config.device,
                 dtype=torch.float32,
-            )  # input wave 44100 -> 16000
+            )
+            
+            # 初始化RMS计算用的缓冲区
             self.rms_buffer: np.ndarray = np.zeros(4 * self.zc, dtype="float32")
+            
+            # 初始化SOLA算法的缓冲区
             self.sola_buffer: torch.Tensor = torch.zeros(
                 self.sola_buffer_frame, device=self.config.device, dtype=torch.float32
             )
+            
+            # 初始化降噪缓冲区
             self.nr_buffer: torch.Tensor = self.sola_buffer.clone()
+            
+            # 初始化输出缓冲区
             self.output_buffer: torch.Tensor = self.input_wav.clone()
+            
+            # 设置跳过的头尾帧数
             self.skip_head = self.extra_frame // self.zc
             self.skip_tail = self.extra_frame_right // self.zc
+            
+            # 计算返回长度
             self.return_length = (
                 self.block_frame + self.sola_buffer_frame + self.sola_search_frame
             ) // self.zc
+            
+            # 创建淡入淡出窗口
             self.fade_in_window: torch.Tensor = (
                 torch.sin(
                     0.5
@@ -881,11 +993,16 @@ if __name__ == "__main__":
                 ** 2
             )
             self.fade_out_window: torch.Tensor = 1 - self.fade_in_window
+            
+            # 初始化重采样器(原始采样率到16kHz)
             self.resampler = tat.Resample(
                 orig_freq=self.gui_config.samplerate,
                 new_freq=16000,
                 dtype=torch.float32,
             ).to(self.config.device)
+            
+            # 如果需要，初始化第二个重采样器(模型采样率到设备采样率)
+            print(f"model_set[-1]['sampling_rate']: {self.model_set[-1]['sampling_rate']}, gui_config.samplerate: {self.gui_config.samplerate}")
             if self.model_set[-1]["sampling_rate"] != self.gui_config.samplerate:
                 self.resampler2 = tat.Resample(
                     orig_freq=self.model_set[-1]["sampling_rate"],
@@ -894,10 +1011,14 @@ if __name__ == "__main__":
                 ).to(self.config.device)
             else:
                 self.resampler2 = None
+            
+            # 初始化VAD(语音活动检测)相关变量
             self.vad_cache = {}
-            self.vad_chunk_size = 1000 * self.gui_config.block_time
+            self.vad_chunk_size = min(500, 1000 * self.gui_config.block_time)
             self.vad_speech_detected = False
             self.set_speech_detected_false_at_end_flag = False
+            
+            # 启动音频流
             self.start_stream()
 
         def start_stream(self):
@@ -911,6 +1032,12 @@ if __name__ == "__main__":
                     extra_settings = sd.WasapiSettings(exclusive=True)
                 else:
                     extra_settings = None
+                '''
+                sounddevice 从麦克风读取音频数据，放入 indata
+                audio_callback 处理这些数据（进行语音转换）
+                处理后的音频数据被写入 outdata
+                sounddevice 将 outdata 中的数据发送到声卡播放
+                '''
                 self.stream = sd.Stream(
                     callback=self.audio_callback,
                     blocksize=self.block_frame,
@@ -934,19 +1061,38 @@ if __name__ == "__main__":
             self, indata: np.ndarray, outdata: np.ndarray, frames, times, status
         ):
             """
+            音频块回调函数，处理实时音频流
+            参数:
+                indata: 输入音频数据，形状为 (frames, channels)
+                outdata: 输出音频缓冲区，需要填充处理后的音频
+                frames: 当前音频块的帧数
+                times: 音频时间戳信息
+                status: 音频流状态信息
             Audio block callback function
+            硬件层 (声卡) 
+            ↓
+            PortAudio (底层音频库)
+            ↓
+            sounddevice (Python包装器)
+            ↓
+            生成 frames, times, status
+            ↓
+            传递给 audio_callback
             """
             global flag_vc
             print(indata.shape)
-            start_time = time.perf_counter()
-            indata = librosa.to_mono(indata.T)
-
-            # VAD first
+            start_time = time.perf_counter()  # 记录处理开始时间
+            indata = librosa.to_mono(indata.T)  # 将多通道音频转换为单声道
+            # 语音活动检测(VAD)
             start_event = torch.cuda.Event(enable_timing=True)
             end_event = torch.cuda.Event(enable_timing=True)
             torch.cuda.synchronize()
             start_event.record()
+            
+            # 将音频重采样到16kHz用于VAD
             indata_16k = librosa.resample(indata, orig_sr=self.gui_config.samplerate, target_sr=16000)
+            
+            # 使用VAD模型检测语音
             res = self.vad_model.generate(input=indata_16k, cache=self.vad_cache, is_final=False, chunk_size=self.vad_chunk_size)
             res_value = res[0]["value"]
             print(res_value)
@@ -954,42 +1100,65 @@ if __name__ == "__main__":
                 self.vad_speech_detected = True
             elif len(res_value) % 2 == 1 and self.vad_speech_detected:
                 self.set_speech_detected_false_at_end_flag = True
+            
             end_event.record()
             torch.cuda.synchronize()  # Wait for the events to be recorded!
             elapsed_time_ms = start_event.elapsed_time(end_event)
             print(f"Time taken for VAD: {elapsed_time_ms}ms")
 
-            # if self.gui_config.threhold > -60:
-            #     indata = np.append(self.rms_buffer, indata)
-            #     rms = librosa.feature.rms(
-            #         y=indata, frame_length=4 * self.zc, hop_length=self.zc
-            #     )[:, 2:]
-            #     self.rms_buffer[:] = indata[-4 * self.zc :]
-            #     indata = indata[2 * self.zc - self.zc // 2 :]
-            #     db_threhold = (
-            #         librosa.amplitude_to_db(rms, ref=1.0)[0] < self.gui_config.threhold
-            #     )
-            #     for i in range(db_threhold.shape[0]):
-            #         if db_threhold[i]:
-            #             indata[i * self.zc : (i + 1) * self.zc] = 0
-            #     indata = indata[self.zc // 2 :]
+            # 音量阈值处理
+            if self.gui_config.threhold > -60:
+                # 添加历史缓冲以计算RMS
+                indata = np.append(self.rms_buffer, indata)
+                # 计算音频的RMS能量
+                rms = librosa.feature.rms(
+                    y=indata, frame_length=4 * self.zc, hop_length=self.zc
+                )[:, 2:]
+                # 更新RMS缓冲区
+                self.rms_buffer[:] = indata[-4 * self.zc :]
+                indata = indata[2 * self.zc - self.zc // 2 :]
+                # 将RMS转换为分贝并与阈值比较
+                db_threhold = (
+                    librosa.amplitude_to_db(rms, ref=1.0)[0] < self.gui_config.threhold
+                )
+                # 将低于阈值的部分置零
+                for i in range(db_threhold.shape[0]):
+                    if db_threhold[i]:
+                        indata[i * self.zc : (i + 1) * self.zc] = 0
+                indata = indata[self.zc // 2 :]
+            # 将self.block_frame和 indata.shape[0] 打印出来
+            print(f"self.block_frame: {self.block_frame}, indata.shape[0]: {indata.shape}")
+            print(f"self.input_wav.shape: {self.input_wav.shape}")
+            
+            # 更新输入音频缓冲区
             self.input_wav[: -self.block_frame] = self.input_wav[
                 self.block_frame :
             ].clone()
             self.input_wav[-indata.shape[0] :] = torch.from_numpy(indata).to(
                 self.config.device
             )
-            self.input_wav_res[: -self.block_frame_16k] = self.input_wav_res[
-                self.block_frame_16k :
-            ].clone()
-            self.input_wav_res[-320 * (indata.shape[0] // self.zc + 1) :] = (
-                self.resampler(self.input_wav[-indata.shape[0] - 2 * self.zc :])[
-                    320:
-                ]
-            )
+            # 保存self.input_wav
+            # sf.write("self.input_wav.wav", self.input_wav.cpu().numpy(), self.gui_config.samplerate)
+            
+            # 更新重采样后的输入缓冲区
+            # self.input_wav_res[: -self.block_frame_16k] = self.input_wav_res[
+            #     self.block_frame_16k :
+            # ].clone()
+            # self.input_wav_res[-320 * (indata.shape[0] // self.zc + 1) :] = (
+            #     self.resampler(self.input_wav[-indata.shape[0] - 2 * self.zc :])[
+            #         320:
+            #     ]
+            # 替换为使用 librosa 的重采样：
+            self.input_wav_res = torch.from_numpy(
+                librosa.resample(
+                    self.input_wav.cpu().numpy(),
+                    orig_sr=self.gui_config.samplerate,
+                    target_sr=16000
+                )
+            ).to(self.config.device)
             print(f"preprocess time: {time.perf_counter() - start_time:.2f}")
             # infer
-            if self.function == "vc":
+            if self.function == "vc": 
                 if self.gui_config.extra_time_ce - self.gui_config.extra_time < 0:
                     raise ValueError("Content encoder extra context must be greater than DiT extra context!")
                 start_event = torch.cuda.Event(enable_timing=True)
@@ -1004,14 +1173,15 @@ if __name__ == "__main__":
                     self.block_frame_16k,
                     self.skip_head,
                     self.skip_tail,
-                    self.return_length,
+                    self.return_length,                          
                     int(self.gui_config.diffusion_steps),
                     self.gui_config.inference_cfg_rate,
                     self.gui_config.max_prompt_length,
                     self.gui_config.extra_time_ce - self.gui_config.extra_time,
+                    self.gui_config.pitch_shift,
                 )
                 if self.resampler2 is not None:
-                    infer_wav = self.resampler2(infer_wav)
+                    infer_wav = self.resampler2(infer_wav.float())
                 end_event.record()
                 torch.cuda.synchronize()  # Wait for the events to be recorded!
                 elapsed_time_ms = start_event.elapsed_time(end_event)
@@ -1022,16 +1192,16 @@ if __name__ == "__main__":
                 infer_wav = self.input_wav_denoise[self.extra_frame :].clone()
             else:
                 infer_wav = self.input_wav[self.extra_frame :].clone()
-
+            
             # SOLA algorithm from https://github.com/yxlllc/DDSP-SVC
             conv_input = infer_wav[
                 None, None, : self.sola_buffer_frame + self.sola_search_frame
             ]
 
-            cor_nom = F.conv1d(conv_input, self.sola_buffer[None, None, :])
+            cor_nom = F.conv1d(conv_input.float(), self.sola_buffer[None, None, :])
             cor_den = torch.sqrt(
                 F.conv1d(
-                    conv_input**2,
+                    (conv_input**2).float(),
                     torch.ones(1, 1, self.sola_buffer_frame, device=self.config.device),
                 )
                 + 1e-8
@@ -1045,7 +1215,7 @@ if __name__ == "__main__":
 
             print(f"sola_offset = {int(sola_offset)}")
 
-            #post_process_start = time.perf_counter()
+            # post_process_start = time.perf_counter()
             infer_wav = infer_wav[sola_offset:]
             infer_wav[: self.sola_buffer_frame] *= self.fade_in_window
             infer_wav[: self.sola_buffer_frame] += (
@@ -1134,8 +1304,8 @@ if __name__ == "__main__":
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint-path", type=str, default=None, help="Path to the model checkpoint")
-    parser.add_argument("--config-path", type=str, default=None, help="Path to the vocoder checkpoint")
+    parser.add_argument("--checkpoint-path", type=str, default='', help="Path to the model checkpoint")
+    parser.add_argument("--config-path", type=str, default='', help="Path to the vocoder checkpoint")
     parser.add_argument("--fp16", type=str2bool, nargs="?", const=True, help="Whether to use fp16", default=True)
     parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
     args = parser.parse_args()
