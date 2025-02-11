@@ -1181,7 +1181,7 @@ if __name__ == "__main__":
                     self.gui_config.pitch_shift,
                 )
                 if self.resampler2 is not None:
-                    infer_wav = self.resampler2(infer_wav)
+                    infer_wav = self.resampler2(infer_wav.float())
                 end_event.record()
                 torch.cuda.synchronize()  # Wait for the events to be recorded!
                 elapsed_time_ms = start_event.elapsed_time(end_event)
