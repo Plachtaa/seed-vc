@@ -979,21 +979,15 @@ if __name__ == "__main__":
             self.input_wav[-indata.shape[0] :] = torch.from_numpy(indata).to(
                 self.config.device
             )
-            # self.input_wav_res[: -self.block_frame_16k] = self.input_wav_res[
-            #     self.block_frame_16k :
-            # ].clone()
-            # self.input_wav_res[-320 * (indata.shape[0] // self.zc + 1) :] = (
-            #     self.resampler(self.input_wav[-indata.shape[0] - 2 * self.zc :])[
-            #         320:
-            #     ]
-            # )
-            self.input_wav_res = torch.from_numpy(
-                librosa.resample(
-                    self.input_wav.cpu().numpy(),
-                    orig_sr=self.gui_config.samplerate,
-                    target_sr=16000
-                )
-            ).to(self.config.device)
+            self.input_wav_res[: -self.block_frame_16k] = self.input_wav_res[
+                self.block_frame_16k :
+            ].clone()
+            self.input_wav_res[-320 * (indata.shape[0] // self.zc + 1) :] = (
+                # self.resampler(self.input_wav[-indata.shape[0] - 2 * self.zc :])[
+                #     320:
+                # ]
+                torch.from_numpy(librosa.resample(self.input_wav[-indata.shape[0] - 2 * self.zc :].cpu().numpy(), orig_sr=self.gui_config.samplerate, target_sr=16000)[320:])
+            )
             print(f"preprocess time: {time.perf_counter() - start_time:.2f}")
             # infer
             if self.function == "vc":
