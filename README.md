@@ -173,6 +173,7 @@ where:
 - [ ] NSF vocoder for better singing voice conversion
 - [x] Fix real-time voice conversion artifact while not talking (done by adding a VAD model)
 - [x] Colab Notebook for fine-tuning example
+- [ ] Replace whisper with more advanced linguistic content extractor
 - [ ] More to be added
 
 ## CHANGELOGS🗒️
