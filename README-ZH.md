@@ -94,6 +94,17 @@ python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-conf
 
 你可以根据设备性能调整 GUI 中的参数，只要推理时间小于块时间，语音转换流就可以正常工作。 注意，如果你正在运行其他占用 GPU 的任务（如游戏、看视频），推理速度可能会下降。
 
+实时转换界面的参数说明：
+- `Diffusion Steps` 是扩散步数，推荐实时转换设置为4~10；
+- `Inference CFG Rate` 是classifier free guidance rate，默认0.7，设置为0.0可以获得1.5x的加速；
+- `Max Prompt Length` 是最大音频提示长度，设置为较低值可以加快推理速度，但可能会降低与提示语音的相似度；
+- `Block Time` 是每块时间，值越高延迟越高，该值必须大于每块推理时间，根据硬件条件设置；
+- `Crossfade Length` 是交叉淡化长度，通常不需要更改；
+- `Extra context (left)` 是推理的额外上下文，设置为较高值可以增加稳定性，但会增加每块推理时间；
+- `Extra context (right)` 是推理的额外上下文，设置为较高值可以增加稳定性，但会增加每块推理时间以及延迟；
+
+算法延迟大约为 `Block Time * 2 + Extra context (right)`，设备侧延迟通常为100ms左右。总体延迟为两者之和。
+
 你可以使用 [VB-CABLE](https://vb-audio.com/Cable/) 将变声器输出映射到一个虚拟麦克风上，以便其它应用读取.  
 
 *(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*

@@ -103,6 +103,17 @@ Some performance testing has been done on a NVIDIA RTX 3060 Laptop GPU, results 
 You can adjust the parameters in the GUI according to your own device performance, the voice conversion stream should work well as long as Inference Time is less than Block Time.  
 Note that inference speed may drop if you are running other GPU intensive tasks (e.g. gaming, watching videos)  
 
+Explanations for real-time voice conversion GUI parameters:
+- `Diffusion Steps` is the number of diffusion steps to use, in real-time case usually set to 4~10 for fastest inference;
+- `Inference CFG Rate` has subtle difference in the output, default is 0.7, set to 0.0 gains about 1.5x speed-up;
+- `Max Prompt Length` is the maximum length of the prompt audio, setting to a low value can speed up inference, but may reduce similarity to prompt speech;
+- `Block Time` is the time length of each audio chunk for inference, the higher the value, the higher the latency, note this value must be greater than the inference time per block, set according to your hardware condition;
+- `Crossfade Length` is the time length of crossfade between audio chunks, normally not needed to change;
+- `Extra context (left)` is the time length of extra history context for inference, the higher the value, the higher the inference time, but can increase stability;
+- `Extra context (right)` is the time length of extra future context for inference, the higher the value, the higher the inference time and latency, but can increase stability;
+
+The algorithm delay is appoximately calculated as `Block Time * 2 + Extra context (right)`, device side delay is usually of ~100ms. The overall delay is the sum of the two.
+
 You may wish to use [VB-CABLE](https://vb-audio.com/Cable/) to route audio from GUI output stream to a virtual microphone.  
 
 *(GUI and audio chunking logic are modified from [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI), thanks for their brilliant implementation!)*
