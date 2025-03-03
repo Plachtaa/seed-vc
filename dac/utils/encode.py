@@ -47,7 +47,7 @@ def encode(
     n_quantizers : int, optional
         Number of quantizers to use, by default None. If not specified, all the quantizers will be used and the model will compress at maximum bitrate.
     device : str, optional
-        Device to use, by default "cuda"
+        Device to use, by default "cuda". Use "mps" on Apple Silicon devices.
     model_type : str, optional
         The type of model to use. Must be one of "44khz", "24khz", or "16khz". Defaults to "44khz". Ignored if `weights_path` is specified.
     """

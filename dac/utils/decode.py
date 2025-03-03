@@ -43,7 +43,7 @@ def decode(
     model_bitrate: str
         Bitrate of the model. Must be one of "8kbps", or "16kbps". Defaults to "8kbps".
     device : str, optional
-        Device to use, by default "cuda". If "cpu", the model will be loaded on the CPU.
+        Device to use, by default "cuda". Use "mps" on Apple Silicon devices or if "cpu", the model will be loaded on the CPU.
     model_type : str, optional
         The type of model to use. Must be one of "44khz", "24khz", or "16khz". Defaults to "44khz". Ignored if `weights_path` is specified.
     """
