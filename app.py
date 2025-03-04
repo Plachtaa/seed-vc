@@ -9,7 +9,13 @@ import numpy as np
 from pydub import AudioSegment
 
 # Load model and configuration
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 
 dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                 "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
@@ -233,8 +239,12 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
         F0_ori = rmvpe.infer_from_audio(ref_waves_16k[0], thred=0.03)
         F0_alt = rmvpe.infer_from_audio(converted_waves_16k[0], thred=0.03)
 
-        F0_ori = torch.from_numpy(F0_ori).to(device)[None]
-        F0_alt = torch.from_numpy(F0_alt).to(device)[None]
+        if device == "mps":
+            F0_ori = torch.from_numpy(F0_ori).float().to(device)[None]
+            F0_alt = torch.from_numpy(F0_alt).float().to(device)[None]
+        else:
+            F0_ori = torch.from_numpy(F0_ori).to(device)[None]
+            F0_alt = torch.from_numpy(F0_alt).to(device)[None]
 
         voiced_F0_ori = F0_ori[F0_ori > 1]
         voiced_F0_alt = F0_alt[F0_alt > 1]

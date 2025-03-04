@@ -18,9 +18,15 @@ We are keeping on improving the model quality and adding more features.
 ## Evaluation📊
 See [EVAL.md](EVAL.md) for objective evaluation results and comparisons with other baselines.
 ## Installation📥
-Suggested python 3.10 on Windows or Linux.
+Suggested python 3.10 on Windows, Mac M Series (Apple Silicon) or Linux.
+Windows and Linux:
 ```bash
 pip install -r requirements.txt
+```
+
+Mac M Series:
+```bash
+pip install -r requirements-mac.txt
 ```
 
 ## Usage🛠️
@@ -93,8 +99,9 @@ python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-conf
 - `checkpoint` is the path to the model checkpoint if you have trained or fine-tuned your own model, leave to blank to auto-download default model from huggingface. (`seed-uvit-tat-xlsr-tiny`)
 - `config` is the path to the model config if you have trained or fine-tuned your own model, leave to blank to auto-download default config from huggingface  
 
-IMPORTANT: It is strongly recommended to use a GPU for real-time voice conversion.  
-Some performance testing has been done on a NVIDIA RTX 3060 Laptop GPU, results and recommended parameter settings are listed below:
+> [!IMPORTANT]
+> It is strongly recommended to use a GPU for real-time voice conversion.
+> Some performance testing has been done on a NVIDIA RTX 3060 Laptop GPU, results and recommended parameter settings are listed below:
 
 | Model Configuration             | Diffusion Steps | Inference CFG Rate | Max Prompt Length | Block Time (s) | Crossfade Length (s) | Extra context (left) (s) | Extra context (right) (s) | Latency (ms) | Inference Time per Chunk (ms) |
 |---------------------------------|-----------------|--------------------|-------------------|----------------|----------------------|--------------------------|---------------------------|--------------|-------------------------------| 
@@ -186,8 +193,15 @@ where:
 - [x] Colab Notebook for fine-tuning example
 - [ ] Replace whisper with more advanced linguistic content extractor
 - [ ] More to be added
+- [x] Add Apple Silicon support
+
+## Known Issues
+- On Mac - running `real-time-gui.py` might raise an error `ModuleNotFoundError: No module named '_tkinter'`, in this case a new Python version **with Tkinter support** should be installed. Refer to [This Guide on stack overflow](https://stackoverflow.com/questions/76105218/why-does-tkinter-or-turtle-seem-to-be-missing-or-broken-shouldnt-it-be-part) for explanation of the problem and a detailed fix.
+
 
 ## CHANGELOGS🗒️
+- 2025-03-03:
+    - Added Mac M Series (Apple Silicon) support
 - 2024-11-26:
     - Updated v1.0 tiny version pretrained model, optimized for real-time voice conversion
     - Support one-shot/few-shot single/multi speaker fine-tuning

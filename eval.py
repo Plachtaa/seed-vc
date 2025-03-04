@@ -23,7 +23,13 @@ from hf_utils import load_custom_model_from_hf
 from resemblyzer import preprocess_wav, VoiceEncoder
 
 # Load model and configuration
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 
 from transformers import Wav2Vec2FeatureExtractor, WavLMForXVector
 from transformers import Wav2Vec2Processor, HubertForCTC
