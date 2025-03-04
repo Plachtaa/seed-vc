@@ -430,5 +430,8 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=0)
     parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
     args = parser.parse_args()
-    args.device = f"cuda:{args.gpu}" if args.gpu else "cuda:0" 
+    if torch.backends.mps.is_available():
+        args.device = "mps"
+    else:
+        args.device = f"cuda:{args.gpu}" if args.gpu else "cuda:0"
     main(args)
