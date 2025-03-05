@@ -294,8 +294,12 @@ def voice_conversion(source, target, diffusion_steps, length_adjust, inference_c
     F0_ori = f0_fn(ref_waves_16k[0], thred=0.03)
     F0_alt = f0_fn(converted_waves_16k[0], thred=0.03)
 
-    F0_ori = torch.from_numpy(F0_ori).to(device)[None]
-    F0_alt = torch.from_numpy(F0_alt).to(device)[None]
+    if device.type == "mps":
+        F0_ori = torch.from_numpy(F0_ori).float().to(device)[None]
+        F0_alt = torch.from_numpy(F0_alt).float().to(device)[None]
+    else:
+        F0_ori = torch.from_numpy(F0_ori).to(device)[None]
+        F0_alt = torch.from_numpy(F0_alt).to(device)[None]
 
     voiced_F0_ori = F0_ori[F0_ori > 1]
     voiced_F0_alt = F0_alt[F0_alt > 1]
@@ -436,5 +440,11 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
     args = parser.parse_args()
     cuda_target = f"cuda:{args.gpu}" if args.gpu else "cuda" 
-    device = torch.device(cuda_target if torch.cuda.is_available() else "cpu")
+
+    if torch.cuda.is_available():
+        device = torch.device(cuda_target)
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     main(args)

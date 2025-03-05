@@ -94,13 +94,22 @@ def custom_infer(model_set,
         reference_wav_name = new_reference_wav_name
 
     converted_waves_16k = input_wav_res
-    start_event = torch.cuda.Event(enable_timing=True)
-    end_event = torch.cuda.Event(enable_timing=True)
-    torch.cuda.synchronize()
+    if device.type == "mps":
+        start_event = torch.mps.event.Event(enable_timing=True)
+        end_event = torch.mps.event.Event(enable_timing=True)
+        torch.mps.synchronize()
+    else:
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        torch.cuda.synchronize()
+
     start_event.record()
     S_alt = semantic_fn(converted_waves_16k.unsqueeze(0))
     end_event.record()
-    torch.cuda.synchronize()  # Wait for the events to be recorded!
+    if device.type == "mps":
+        torch.mps.synchronize()  # MPS - Wait for the events to be recorded!
+    else:
+        torch.cuda.synchronize()  # Wait for the events to be recorded!
     elapsed_time_ms = start_event.elapsed_time(end_event)
     print(f"Time taken for semantic_fn: {elapsed_time_ms}ms")
 
@@ -466,7 +475,14 @@ if __name__ == "__main__":
                                     initial_folder=os.path.join(
                                         os.getcwd(), "examples/reference"
                                     ),
-                                    file_types=((". wav"), (". mp3"), (". flac"), (". m4a"), (". ogg"), (". opus")),
+                                    file_types=[
+                                        ("WAV Files", "*.wav"),
+                                        ("MP3 Files", "*.mp3"),
+                                        ("FLAC Files", "*.flac"),
+                                        ("M4A Files", "*.m4a"),
+                                        ("OGG Files", "*.ogg"),
+                                        ("Opus Files", "*.opus"),
+                                    ],
                                 ),
                             ],
                         ],
@@ -786,7 +802,10 @@ if __name__ == "__main__":
             return True
 
         def start_vc(self):
-            torch.cuda.empty_cache()
+            if device.type == "mps":
+                torch.mps.empty_cache()
+            else:
+                torch.cuda.empty_cache()
             self.reference_wav, _ = librosa.load(
                 self.gui_config.reference_audio_path, sr=self.model_set[-1]["sampling_rate"]
             )
@@ -942,9 +961,14 @@ if __name__ == "__main__":
             indata = librosa.to_mono(indata.T)
 
             # VAD first
-            start_event = torch.cuda.Event(enable_timing=True)
-            end_event = torch.cuda.Event(enable_timing=True)
-            torch.cuda.synchronize()
+            if device.type == "mps":
+                start_event = torch.mps.event.Event(enable_timing=True)
+                end_event = torch.mps.event.Event(enable_timing=True)
+                torch.mps.synchronize()
+            else:
+                start_event = torch.cuda.Event(enable_timing=True)
+                end_event = torch.cuda.Event(enable_timing=True)
+                torch.cuda.synchronize()
             start_event.record()
             indata_16k = librosa.resample(indata, orig_sr=self.gui_config.samplerate, target_sr=16000)
             res = self.vad_model.generate(input=indata_16k, cache=self.vad_cache, is_final=False, chunk_size=self.vad_chunk_size)
@@ -955,7 +979,10 @@ if __name__ == "__main__":
             elif len(res_value) % 2 == 1 and self.vad_speech_detected:
                 self.set_speech_detected_false_at_end_flag = True
             end_event.record()
-            torch.cuda.synchronize()  # Wait for the events to be recorded!
+            if device.type == "mps":
+                torch.mps.synchronize()  # MPS - Wait for the events to be recorded!
+            else:
+                torch.cuda.synchronize()  # Wait for the events to be recorded!
             elapsed_time_ms = start_event.elapsed_time(end_event)
             print(f"Time taken for VAD: {elapsed_time_ms}ms")
 
@@ -993,9 +1020,14 @@ if __name__ == "__main__":
             if self.function == "vc":
                 if self.gui_config.extra_time_ce - self.gui_config.extra_time < 0:
                     raise ValueError("Content encoder extra context must be greater than DiT extra context!")
-                start_event = torch.cuda.Event(enable_timing=True)
-                end_event = torch.cuda.Event(enable_timing=True)
-                torch.cuda.synchronize()
+                if device.type == "mps":
+                    start_event = torch.mps.event.Event(enable_timing=True)
+                    end_event = torch.mps.event.Event(enable_timing=True)
+                    torch.mps.synchronize()
+                else:
+                    start_event = torch.cuda.Event(enable_timing=True)
+                    end_event = torch.cuda.Event(enable_timing=True)
+                    torch.cuda.synchronize()
                 start_event.record()
                 infer_wav = custom_infer(
                     self.model_set,
@@ -1014,7 +1046,10 @@ if __name__ == "__main__":
                 if self.resampler2 is not None:
                     infer_wav = self.resampler2(infer_wav)
                 end_event.record()
-                torch.cuda.synchronize()  # Wait for the events to be recorded!
+                if device.type == "mps":
+                    torch.mps.synchronize()  # MPS - Wait for the events to be recorded!
+                else:
+                    torch.cuda.synchronize()  # Wait for the events to be recorded!
                 elapsed_time_ms = start_event.elapsed_time(end_event)
                 print(f"Time taken for VC: {elapsed_time_ms}ms")
                 if not self.vad_speech_detected:
@@ -1037,12 +1072,16 @@ if __name__ == "__main__":
                 )
                 + 1e-8
             )
-            if sys.platform == "darwin":
-                _, sola_offset = torch.max(cor_nom[0, 0] / cor_den[0, 0])
-                sola_offset = sola_offset.item()
-            else:
 
-                sola_offset = torch.argmax(cor_nom[0, 0] / cor_den[0, 0])
+            tensor = cor_nom[0, 0] / cor_den[0, 0]
+            if tensor.numel() > 1:  # If tensor has multiple elements
+                if sys.platform == "darwin":
+                    _, sola_offset = torch.max(tensor, dim=0)
+                    sola_offset = sola_offset.item()
+                else:
+                    sola_offset = torch.argmax(tensor, dim=0).item()
+            else:
+                sola_offset = tensor.item()
 
             print(f"sola_offset = {int(sola_offset)}")
 
@@ -1141,5 +1180,11 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, help="Which GPU id to use", default=0)
     args = parser.parse_args()
     cuda_target = f"cuda:{args.gpu}" if args.gpu else "cuda" 
-    device = torch.device(cuda_target if torch.cuda.is_available() else "cpu")
+
+    if torch.cuda.is_available():
+        device = torch.device(cuda_target)
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     gui = GUI(args)
