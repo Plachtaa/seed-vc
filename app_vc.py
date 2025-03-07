@@ -19,13 +19,13 @@ def load_models(args):
     fp16 = args.fp16
     print(f"Using device: {device}")
     print(f"Using fp16: {fp16}")
-    if args.checkpoint_path is None or args.checkpoint_path == "":
+    if args.checkpoint is None or args.checkpoint == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
                                                                          "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
     else:
-        dit_checkpoint_path = args.checkpoint_path
-        dit_config_path = args.config_path
+        dit_checkpoint_path = args.checkpoint
+        dit_config_path = args.config
     config = yaml.safe_load(open(dit_config_path, "r"))
     model_params = recursive_munch(config["model_params"])
     model_params.dit_type = 'DiT'

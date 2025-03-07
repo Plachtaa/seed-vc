@@ -91,7 +91,7 @@ python app.py
 
 リアルタイム音声変換GUI：
 ```bash
-python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-config>
+python real-time-gui.py --checkpoint-path <path-to-checkpoint> --config-path <path-to-config>
 ```
 - `checkpoint` は独自のモデルをトレーニングまたはファインチューニングした場合のモデルチェックポイントへのパス、空白の場合はhuggingfaceからデフォルトモデルを自動ダウンロード（`seed-uvit-tat-xlsr-tiny`）
 - `config` は独自のモデルをトレーニングまたはファインチューニングした場合のモデル設定へのパス、空白の場合はhuggingfaceからデフォルト設定を自動ダウンロード

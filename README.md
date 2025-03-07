@@ -94,7 +94,7 @@ This will only load pretrained models for zero-shot inference. To use custom che
 
 Real-time voice conversion GUI:
 ```bash
-python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-config>
+python real-time-gui.py --checkpoint-path <path-to-checkpoint> --config-path <path-to-config>
 ```
 - `checkpoint` is the path to the model checkpoint if you have trained or fine-tuned your own model, leave to blank to auto-download default model from huggingface. (`seed-uvit-tat-xlsr-tiny`)
 - `config` is the path to the model config if you have trained or fine-tuned your own model, leave to blank to auto-download default config from huggingface  

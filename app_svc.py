@@ -20,14 +20,14 @@ def load_models(args):
     print(f"Using device: {device}")
     print(f"Using fp16: {fp16}")
     # f0 conditioned model
-    if args.checkpoint_path is None or args.checkpoint_path == "":
+    if args.checkpoint is None or args.checkpoint == "":
         dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
                                                                          "DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth",
                                                                          "config_dit_mel_seed_uvit_whisper_base_f0_44k.yml")
     else:
-        print(f"Using custom checkpoint: {args.checkpoint_path}")
-        dit_checkpoint_path = args.checkpoint_path
-        dit_config_path = args.config_path
+        print(f"Using custom checkpoint: {args.checkpoint}")
+        dit_checkpoint_path = args.checkpoint
+        dit_config_path = args.config
     config = yaml.safe_load(open(dit_config_path, "r"))
     model_params = recursive_munch(config["model_params"])
     model_params.dit_type = 'DiT'

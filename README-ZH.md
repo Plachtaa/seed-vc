@@ -81,7 +81,7 @@ python app.py
 
 实时语音转换 GUI:
 ```bash
-python real-time-gui.py --checkpoint <path-to-checkpoint> --config <path-to-config>
+python real-time-gui.py --checkpoint-path <path-to-checkpoint> --config-path <path-to-config>
 ```
 - `checkpoint` 模型检查点路径，若为空将自动下载默认模型 (`seed-uvit-tat-xlsr-tiny`)
 - `config` 模型配置文件路径，若为空将自动下载默认配置  
