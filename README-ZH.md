@@ -66,6 +66,9 @@ python app_vc.py --checkpoint <path-to-checkpoint> --config <path-to-config>
 
 然后在浏览器中打开 `http://localhost:7860/` 使用 Web 界面。
 
+运行命令前先设置环境变量:
+`export export HUGGING_FACE_HUB_TOKEN={从https://huggingface.co/settings/tokens获取}`
+
 歌声转换 Web UI:
 ```bash
 python app_svc.py --checkpoint <path-to-checkpoint> --config <path-to-config>
