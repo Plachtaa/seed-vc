@@ -38,10 +38,13 @@ def load_models(args):
     global fp16
     fp16 = args.fp16
     if not args.f0_condition:
-        dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
-                                                                         "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
-                                                                         "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
-        f0_fn = None
+        if args.checkpoint is None:
+            dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
+                                                                            "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
+                                                                            "config_dit_mel_seed_uvit_whisper_small_wavenet.yml")
+        else:
+            dit_checkpoint_path = args.checkpoint
+            dit_config_path = args.config
     else:
         if args.checkpoint is None:
             dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
