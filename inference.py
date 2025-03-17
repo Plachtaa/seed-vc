@@ -45,6 +45,7 @@ def load_models(args):
         else:
             dit_checkpoint_path = args.checkpoint
             dit_config_path = args.config
+        f0_fn = None
     else:
         if args.checkpoint is None:
             dit_checkpoint_path, dit_config_path = load_custom_model_from_hf("Plachta/Seed-VC",
