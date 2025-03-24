@@ -228,3 +228,8 @@ where:
     - Updated v0.2 pretrained model, with smaller size and less diffusion steps to achieve same quality, and additional ability to control prosody preservation
     - Added command line inference script
     - Added installation and usage instructions
+
+## Acknowledgements🙏
+- [Amphion](https://github.com/open-mmlab/Amphion) for providing computational resources and inspiration!
+- [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) for foundationing the real-time voice conversion
+- [SEED-TTS](https://arxiv.org/abs/2406.02430) for the initial idea

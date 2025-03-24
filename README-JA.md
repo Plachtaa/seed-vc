@@ -220,3 +220,8 @@ python train.py
     - 同じ品質を達成するためのサイズ縮小と拡散ステップ数の削減、およびプロソディ保持の制御能力を追加したv0.2事前学習済みモデルを更新
     - コマンドライン推論スクリプトを追加
     - インストールと使用方法の説明を追加
+
+## 謝辞🙏
+- [Amphion](https://github.com/open-mmlab/Amphion) for providing computational resources and inspiration!
+- [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) for foundationing the real-time voice conversion
+- [SEED-TTS](https://arxiv.org/abs/2406.02430) for the initial idea

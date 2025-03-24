@@ -206,3 +206,8 @@ where:
     - 更新了 v0.2 预训练模型，具有更小的尺寸和更少的扩散步骤即可达到相同质量，且增加了控制韵律保留的能力
     - 添加了命令行推理脚本
     - 添加了安装和使用说明
+
+## 鸣谢🙏
+- [Amphion](https://github.com/open-mmlab/Amphion) for providing computational resources and inspiration!
+- [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) for foundationing the real-time voice conversion
+- [SEED-TTS](https://arxiv.org/abs/2406.02430) for the initial idea
