@@ -31,9 +31,23 @@ def statistics_pooling(x, dim=-1, keepdim=False, unbiased=True, eps=1e-2):
         stats = stats.unsqueeze(dim=dim)
     return stats
 
+def masked_statistics_pooling(x, x_lens, dim=-1, keepdim=False, unbiased=True, eps=1e-2):
+    stats = []
+    for i, x_len in enumerate(x_lens):
+        x_i = x[i, :, :x_len]
+        mean = x_i.mean(dim=dim)
+        std = x_i.std(dim=dim, unbiased=unbiased)
+        stats.append(torch.cat([mean, std], dim=-1))
+    stats = torch.stack(stats, dim=0)
+    if keepdim:
+        stats = stats.unsqueeze(dim=dim)
+    return stats
+
 
 class StatsPool(nn.Module):
-    def forward(self, x):
+    def forward(self, x, x_lens=None):
+        if x_lens is not None:
+            return masked_statistics_pooling(x, x_lens)
         return statistics_pooling(x)
 
 

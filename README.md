@@ -30,14 +30,14 @@ pip install -r requirements-mac.txt
 ```
 
 ## Usage🛠️
-We have released 3 models for different purposes:
+We have released 4 models for different purposes:
 
-| Version | Name                                                                                                                                                                                                                       | Purpose                        | Sampling Rate | Content Encoder | Vocoder | Hidden Dim | N Layers | Params | Remarks                                                |
-|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|---------------|-----------------|---------|------------|----------|--------|--------------------------------------------------------|
-| v1.0    | seed-uvit-tat-xlsr-tiny ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_uvit_tat_xlsr_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_xlsr_tiny.yml))                                                     | Voice Conversion (VC)          | 22050         | XLSR-large      | HIFT    | 384        | 9        | 25M    | suitable for real-time voice conversion                |
-| v1.0    | seed-uvit-whisper-small-wavenet ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_small_wavenet.yml)) | Voice Conversion (VC)          | 22050         | Whisper-small   | BigVGAN | 512        | 13       | 98M    | suitable for offline voice conversion                  |
-| v1.0    | seed-uvit-whisper-base ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_base_f0_44k.yml))       | Singing Voice Conversion (SVC) | 44100         | Whisper-small   | BigVGAN | 768        | 17       | 200M   | strong zero-shot performance, singing voice conversion |
-
+| Version | Name                                                                                                                                                                                                                       | Purpose                        | Sampling Rate | Content Encoder         | Vocoder | Hidden Dim | N Layers | Params | Remarks                                                |
+|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|---------------|-------------------------|---------|------------|----------|--------|--------------------------------------------------------|
+| v1.0    | seed-uvit-tat-xlsr-tiny ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_uvit_tat_xlsr_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_xlsr_tiny.yml))                                                     | Voice Conversion (VC)          | 22050         | XLSR-large              | HIFT    | 384        | 9        | 25M    | suitable for real-time voice conversion                |
+| v1.0    | seed-uvit-whisper-small-wavenet ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_small_wavenet.yml)) | Voice Conversion (VC)          | 22050         | Whisper-small           | BigVGAN | 512        | 13       | 98M    | suitable for offline voice conversion                  |
+| v1.0    | seed-uvit-whisper-base ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema.pth)[📄](configs/presets/config_dit_mel_seed_uvit_whisper_base_f0_44k.yml))       | Singing Voice Conversion (SVC) | 44100         | Whisper-small           | BigVGAN | 768        | 17       | 200M   | strong zero-shot performance, singing voice conversion |
+| v2.0    | hubert-bsqvae-small ([🤗](https://huggingface.co/Plachta/Seed-VC/blob/main/v2)[📄](configs/v2/vc_wrapper.yaml))                                                                                                        | Voice & Accent Conversion (VC) | 22050         | [ASTRAL-Quantization](https://github.com/Plachtaa/ASTRAL-quantization) | BigVGAN | 512        | 13       | 67M    | Best in suppressing source speaker traits              |
 Checkpoints of the latest model release will be downloaded automatically when first run inference.  
 If you are unable to access huggingface for network reason, try using mirror by adding `HF_ENDPOINT=https://hf-mirror.com` before every command.
 
@@ -70,6 +70,25 @@ where:
 - `config` is the path to the model config if you have trained or fine-tuned your own model, leave to blank to auto-download default config from huggingface  
 - `fp16` is the flag to use float16 inference, default is True
 
+Similarly, to use V2 model, you can run:
+```bash
+python inference_v2.py --source <source-wav>
+--target <referene-wav>
+--output <output-dir>
+--diffusion-steps 25 # recommended 30~50 for singingvoice conversion
+--length-adjust 1.0 # same as V1
+--intelligibility-cfg-rate 0.7 # controls how clear the output linguistic content is, recommended 0.0~1.0
+--similarity-cfg-rate 0.7 # controls how similar the output voice is to the reference voice, recommended 0.0~1.0
+--convert-style true # whether to use AR model for accent & emotion conversion, set to false will only conduct timbre conversion similar to V1
+--anonymization-only false # set to true will ignore reference audio but only anonymize source speech to an "average voice"
+--top-p 0.9 # controls the diversity of the AR model output, recommended 0.5~1.0
+--temperature 1.0 # controls the randomness of the AR model output, recommended 0.7~1.2
+--repetition-penalty 1.0 # penalizes the repetition of the AR model output, recommended 1.0~1.5
+--cfm-checkpoint-path <path-to-cfm-checkpoint> # path to the checkpoint of the CFM model, leave to blank to auto-download default model from huggingface
+--ar-checkpoint-path <path-to-ar-checkpoint> # path to the checkpoint of the AR model, leave to blank to auto-download default model from huggingface
+```
+
+
 Voice Conversion Web UI:
 ```bash
 python app_vc.py --checkpoint <path-to-checkpoint> --config <path-to-config> --fp16 True
@@ -86,11 +105,18 @@ python app_svc.py --checkpoint <path-to-checkpoint> --config <path-to-config> --
 - `checkpoint` is the path to the model checkpoint if you have trained or fine-tuned your own model, leave to blank to auto-download default model from huggingface. (`seed-uvit-whisper-base`)
 - `config` is the path to the model config if you have trained or fine-tuned your own model, leave to blank to auto-download default config from huggingface  
 
+V2 model Web UI:
+```bash
+python app_vc_v2.py --cfm-checkpoint-path <path-to-cfm-checkpoint> --ar-checkpoint-path <path-to-ar-checkpoint>
+```
+- `cfm-checkpoint-path` is the path to the checkpoint of the CFM model, leave to blank to auto-download default model from huggingface
+- `ar-checkpoint-path` is the path to the checkpoint of the AR model, leave to blank to auto-download default model from huggingface
 Integrated Web UI:
 ```bash
-python app.py
+python app.py --enable-v1 --enable-v2
 ```
-This will only load pretrained models for zero-shot inference. To use custom checkpoints, please run `app_vc.py` or `app_svc.py` as above.
+This will only load pretrained models for zero-shot inference. To use custom checkpoints, please run `app_vc.py` or `app_svc.py` as above.  
+If you have limited memory, remove `--enable-v2` or `--enable-v1` to only load one of the model sets.
 
 Real-time voice conversion GUI:
 ```bash
@@ -162,6 +188,19 @@ where:
 - `save-every` is the number of steps to save the model checkpoint
 - `num-workers` is the number of workers for data loading, set to 0 for Windows    
 
+Similarly, to train V2 model, you can run: (note that V2 training script supports multi-GPU training)
+```bash
+accelerate launch train_v2.py 
+--dataset-dir <path-to-data>
+--run-name <run-name>
+--batch-size 2
+--max-steps 1000
+--max-epochs 1000
+--save-every 500
+--num-workers 0
+--train-cfm
+```
+
 4. If training accidentially stops, you can resume training by running the same command again, the training will continue from the last checkpoint. (Make sure `run-name` and `config` arguments are the same so that latest checkpoint can be found)
 
 5. After training, you can use the trained model for inference by specifying the path to the checkpoint and config file.
@@ -191,15 +230,18 @@ where:
 - [ ] NSF vocoder for better singing voice conversion
 - [x] Fix real-time voice conversion artifact while not talking (done by adding a VAD model)
 - [x] Colab Notebook for fine-tuning example
-- [ ] Replace whisper with more advanced linguistic content extractor
+- [x] Replace whisper with more advanced linguistic content extractor
 - [ ] More to be added
 - [x] Add Apple Silicon support
+- [ ] Release paper, evaluations and demo page for V2 model
 
 ## Known Issues
 - On Mac - running `real-time-gui.py` might raise an error `ModuleNotFoundError: No module named '_tkinter'`, in this case a new Python version **with Tkinter support** should be installed. Refer to [This Guide on stack overflow](https://stackoverflow.com/questions/76105218/why-does-tkinter-or-turtle-seem-to-be-missing-or-broken-shouldnt-it-be-part) for explanation of the problem and a detailed fix.
 
 
 ## CHANGELOGS🗒️
+- 2024-04-16
+    - Released V2 model for voice and accent conversion, with better anonymization of source speaker
 - 2025-03-03:
     - Added Mac M Series (Apple Silicon) support
 - 2024-11-26:
@@ -231,5 +273,8 @@ where:
 
 ## Acknowledgements🙏
 - [Amphion](https://github.com/open-mmlab/Amphion) for providing computational resources and inspiration!
+- [Vevo](https://github.com/open-mmlab/Amphion/tree/main/models/vc/vevo) for theoretical foundation of V2 model
+- [MegaTTS3](https://github.com/bytedance/MegaTTS3) for multi-condition CFG inference implemented in V2 model
+- [ASTRAL-quantiztion](https://github.com/Plachtaa/ASTRAL-quantization) for the amazing speaker-disentangled speech tokenizer used by V2 model
 - [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) for foundationing the real-time voice conversion
 - [SEED-TTS](https://arxiv.org/abs/2406.02430) for the initial idea

@@ -33,9 +33,9 @@ class FT_Dataset(torch.utils.data.Dataset):
         self.sr = sr
         self.mel_fn_args = {
             "n_fft": spect_params['n_fft'],
-            "win_size": spect_params['win_length'],
-            "hop_size": spect_params['hop_length'],
-            "num_mels": spect_params['n_mels'],
+            "win_size": spect_params.get('win_length', spect_params['win_size']),
+            "hop_size": spect_params.get('hop_length', spect_params['hop_size']),
+            "num_mels": spect_params.get('n_mels', spect_params['num_mels']),
             "sampling_rate": sr,
             "fmin": spect_params['fmin'],
             "fmax": None if spect_params['fmax'] == "None" else spect_params['fmax'],

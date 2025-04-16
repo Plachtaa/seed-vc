@@ -394,10 +394,7 @@ def build_model(args, stage="DiT"):
             sampling_ratios=args.length_regulator.sampling_ratios,
             is_discrete=args.length_regulator.is_discrete,
             in_channels=args.length_regulator.in_channels if hasattr(args.length_regulator, "in_channels") else None,
-            vector_quantize=args.length_regulator.vector_quantize if hasattr(args.length_regulator, "vector_quantize") else False,
             codebook_size=args.length_regulator.content_codebook_size,
-            n_codebooks=args.length_regulator.n_codebooks if hasattr(args.length_regulator, "n_codebooks") else 1,
-            quantizer_dropout=args.length_regulator.quantizer_dropout if hasattr(args.length_regulator, "quantizer_dropout") else 0.0,
             f0_condition=args.length_regulator.f0_condition if hasattr(args.length_regulator, "f0_condition") else False,
             n_f0_bins=args.length_regulator.n_f0_bins if hasattr(args.length_regulator, "n_f0_bins") else 512,
         )
@@ -405,44 +402,6 @@ def build_model(args, stage="DiT"):
         nets = Munch(
             cfm=cfm,
             length_regulator=length_regulator,
-        )
-    elif stage == 'codec':
-        from dac.model.dac import Encoder
-        from modules.quantize import (
-            FAquantizer,
-        )
-
-        encoder = Encoder(
-            d_model=args.DAC.encoder_dim,
-            strides=args.DAC.encoder_rates,
-            d_latent=1024,
-            causal=args.causal,
-            lstm=args.lstm,
-        )
-
-        quantizer = FAquantizer(
-            in_dim=1024,
-            n_p_codebooks=1,
-            n_c_codebooks=args.n_c_codebooks,
-            n_t_codebooks=2,
-            n_r_codebooks=3,
-            codebook_size=1024,
-            codebook_dim=8,
-            quantizer_dropout=0.5,
-            causal=args.causal,
-            separate_prosody_encoder=args.separate_prosody_encoder,
-            timbre_norm=args.timbre_norm,
-        )
-
-        nets = Munch(
-            encoder=encoder,
-            quantizer=quantizer,
-        )
-    elif stage == "mel_vocos":
-        from modules.vocos import Vocos
-        decoder = Vocos(args)
-        nets = Munch(
-            decoder=decoder,
         )
     else:
         raise ValueError(f"Unknown stage: {stage}")

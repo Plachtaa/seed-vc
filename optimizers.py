@@ -83,8 +83,8 @@ def build_optimizer(model_dict, lr, type='AdamW'):
                 model_parameters,
                 lr=lr,
                 betas=(0.9, 0.98),
-                eps=1e-9,
-                weight_decay=0.1,
+                eps=1e-6,
+                weight_decay=0.01,
             )
         else:
             raise ValueError('Unknown optimizer type: %s' % type)
@@ -94,3 +94,27 @@ def build_optimizer(model_dict, lr, type='AdamW'):
 
     multi_optim = MultiOptimizer(optim, schedulers)
     return multi_optim
+
+class MinLRExponentialLR(torch.optim.lr_scheduler.ExponentialLR):
+    def __init__(self, optimizer, gamma, min_lr=1e-5):
+        self.min_lr = min_lr
+        super().__init__(optimizer, gamma)
+
+    def get_lr(self):
+        lrs = super().get_lr()
+        return [max(lr, self.min_lr) for lr in lrs]
+
+def build_single_optimizer(model, lr,):
+    model_parameters = model.parameters()
+    parameters_require_grad = filter(lambda p: p.requires_grad, model_parameters)
+    optim = AdamW(
+        parameters_require_grad,
+        lr=lr,
+        betas=(0.9, 0.98),
+        eps=1e-6,
+        weight_decay=0.01,
+    )
+
+    scheduler = MinLRExponentialLR(optim, gamma=0.999996, min_lr=1e-5)
+
+    return optim, scheduler

@@ -97,10 +97,12 @@ class CAMPPlus(nn.Module):
         self.xvector.add_module(
             'out_nonlinear', get_nonlinear(config_str, channels))
 
-        self.xvector.add_module('stats', StatsPool())
-        self.xvector.add_module(
-            'dense',
-            DenseLayer(channels * 2, embedding_size, config_str='batchnorm_'))
+        # self.xvector.add_module('stats', StatsPool())
+        # self.xvector.add_module(
+        #     'dense',
+        #     DenseLayer(channels * 2, embedding_size, config_str='batchnorm_'))
+        self.stats = StatsPool()
+        self.dense = DenseLayer(channels * 2, embedding_size, config_str='batchnorm_')
 
         for m in self.modules():
             if isinstance(m, (nn.Conv1d, nn.Linear)):
@@ -108,8 +110,29 @@ class CAMPPlus(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward(self, x):
+    def load_state_dict(self, state_dict, strict=True):
+        """
+        Custom load_state_dict that remaps keys from a previous version of the model where
+        stats and dense layers were part of xvector.
+        """
+        new_state_dict = {}
+
+        # Remap keys for compatibility
+        for key in state_dict.keys():
+            new_key = key
+            if key.startswith('xvector.stats'):
+                new_key = key.replace('xvector.stats', 'stats')
+            elif key.startswith('xvector.dense'):
+                new_key = key.replace('xvector.dense', 'dense')
+            new_state_dict[new_key] = state_dict[key]
+
+        # Call the original load_state_dict with the modified state_dict
+        super(CAMPPlus, self).load_state_dict(new_state_dict, strict)
+
+    def forward(self, x, x_lens=None):
         x = x.permute(0, 2, 1)  # (B,T,F) => (B,F,T)
         x = self.head(x)
         x = self.xvector(x)
+        x = self.stats(x, x_lens)
+        x = self.dense(x)
         return x

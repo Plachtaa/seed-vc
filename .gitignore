@@ -13,6 +13,7 @@ __pycache__/
 
 # IDE
 .vscode/
+.idea/
 
 # misc
 checkpoints/
@@ -21,3 +22,7 @@ reconstructed/
 .python-version
 ruff.log
 /configs/inuse/
+runs/
+/garbages/
+/flagged/
+/experimental/
