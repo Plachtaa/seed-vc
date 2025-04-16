@@ -112,6 +112,8 @@ python app_vc_v2.py --cfm-checkpoint-path <path-to-cfm-checkpoint> --ar-checkpoi
 ```
 - `cfm-checkpoint-path` is the path to the checkpoint of the CFM model, leave to blank to auto-download default model from huggingface
 - `ar-checkpoint-path` is the path to the checkpoint of the AR model, leave to blank to auto-download default model from huggingface
+- you may consider adding `--compile` to gain ~x6 speed-up on AR model inference  
+- 
 Integrated Web UI:
 ```bash
 python app.py --enable-v1 --enable-v2
