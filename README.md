@@ -29,6 +29,11 @@ Mac M Series:
 pip install -r requirements-mac.txt
 ```
 
+For Windows users, you may consider install `triton-windows` to enable `--compile` usage, which gains speed up on V2 models:
+```bash
+pip install triton-windows==3.2.0.post13
+```
+
 ## Usage🛠️
 We have released 4 models for different purposes:
 
