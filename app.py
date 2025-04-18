@@ -31,6 +31,7 @@ def load_v2_models(args):
     vc_wrapper.setup_ar_caches(max_batch_size=1, max_seq_len=4096, dtype=dtype, device=device)
 
     if args.compile:
+        print("Compiling model with torch.compile...")
         torch._inductor.config.coordinate_descent_tuning = True
         torch._inductor.config.triton.unique_kernel_names = True
 
@@ -77,12 +78,6 @@ def convert_voice_v2_wrapper(source_audio_path, target_audio_path, diffusion_ste
     Wrapper function for vc_wrapper.convert_voice_with_streaming that can be decorated with @spaces.GPU
     """
     global vc_wrapper_v2
-    if vc_wrapper_v2 is None:
-        # Initialize with default arguments
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--compile", type=bool, default=True)
-        args = parser.parse_args([])
-        vc_wrapper_v2 = load_v2_models(args)
 
     # Use yield from to properly handle the generator
     yield from vc_wrapper_v2.convert_voice_with_streaming(
@@ -154,7 +149,7 @@ def create_v1_interface():
     )
 
 
-def create_v2_interface(vc_wrapper):
+def create_v2_interface():
     # Set up Gradio interface
     description = (
         "Zero-shot voice/style conversion with in-context learning. For local deployment please check [GitHub repository](https://github.com/Plachtaa/seed-vc) "
@@ -213,6 +208,7 @@ def create_v2_interface(vc_wrapper):
 
 
 def main(args):
+    global vc_wrapper_v1, vc_wrapper_v2
     # Create interfaces based on enabled versions
     interfaces = []
 
@@ -220,7 +216,7 @@ def main(args):
     if args.enable_v2:
         print("Loading V2 models...")
         vc_wrapper_v2 = load_v2_models(args)
-        v2_interface = create_v2_interface(vc_wrapper_v2)
+        v2_interface = create_v2_interface()
         interfaces.append(("V2 - Voice & Style Conversion", v2_interface))
 
     # Create V1 interface if enabled
@@ -256,10 +252,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--compile", type=bool, default=False)
-    parser.add_argument("--enable-v1", type=bool, default=False,
+    parser.add_argument("--compile", action="store_true", help="Compile the model using torch.compile")
+    parser.add_argument("--enable-v1", action="store_true",
                         help="Enable V1 (Voice & Singing Voice Conversion)")
-    parser.add_argument("--enable-v2", type=bool, default=False,
+    parser.add_argument("--enable-v2", action="store_true",
                         help="Enable V2 (Voice & Style Conversion)")
     args = parser.parse_args()
     main(args)
