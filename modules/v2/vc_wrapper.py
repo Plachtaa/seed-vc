@@ -49,6 +49,7 @@ class VoiceConversionWrapper(torch.nn.Module):
         self.compiled_decode_fn = None
         self.dit_compiled = False
         self.dit_max_context_len = 30  # in seconds
+        self.ar_max_content_len = 1500  # in num of narrow tokens
         self.compile_len = 87 * self.dit_max_context_len
 
     def forward_cfm(self, content_indices_wide, content_lens, mels, mel_lens, style_vectors):
@@ -575,7 +576,7 @@ class VoiceConversionWrapper(torch.nn.Module):
             src_narrow_reduced, src_narrow_len = self.duration_reduction_func(source_narrow_indices[0], 1)
             tgt_narrow_reduced, tgt_narrow_len = self.duration_reduction_func(target_narrow_indices[0], 1)
             # Process src_narrow_reduced in chunks of max 1000 tokens
-            max_chunk_size = 1000
+            max_chunk_size = self.ar_max_content_len - tgt_narrow_len
 
             # Process src_narrow_reduced in chunks
             for i in range(0, len(src_narrow_reduced), max_chunk_size):
